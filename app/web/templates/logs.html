@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Логи - News Digest App{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-journal-text"></i> Системные логи
+        </h1>
+        <p class="text-muted">
+            Логи отображаются в обратном хронологическом порядке (сверху — новые).
+            Прокрутите вниз для загрузки истории.
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <h5 class="card-title mb-0 me-3">
+                        <i class="bi bi-file-text"></i> Просмотр логов
+                    </h5>
+                    <div id="file-selector-container"></div>
+                </div>
+
+                <div>
+                    <span class="badge bg-secondary me-2" id="log-status-badge">0 строк</span>
+                    <button class="btn btn-sm btn-primary" onclick="resetLogs()" id="refresh-btn">
+                        <i class="bi bi-arrow-clockwise"></i> Обновить
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body p-0">
+                <div class="log-container bg-dark text-light p-3"
+                     style="height: 700px; overflow-y: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85em;"
+                     id="logs-container">
+
+                    <div id="file-logs-content">
+                        </div>
+
+                    <div id="loading-indicator" class="text-center py-4" style="display: none;">
+                        <div class="spinner-border spinner-border-sm text-light" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <span class="ms-2">Загрузка истории...</span>
+                    </div>
+
+                    <div id="end-of-logs" class="text-center py-4 text-muted" style="display: none;">
+                        <i class="bi bi-check-circle"></i> Конец файла логов
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-muted small">
+                Отображено <span id="shown-lines">0</span> строк.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Глобальные переменные
+let currentPage = 1;
+let isLoading = false;
+let hasMoreLogs = true;
+let logFiles = [];
+let currentLogFileIndex = 0;
+const PAGE_SIZE = 100;
+let totalShown = 0;
+
+// Цвета для подсветки уровней (упрощенная версия без парсинга всей строки)
+const levelColors = {
+    'ERROR': '#ff6b6b',
+    'CRITICAL': '#ff6b6b',
+    'WARNING': '#ffd93d',
+    'INFO': '#6bcf7f',
+    'DEBUG': '#6c8eff'
+};
+
+$(document).ready(function() {
+    loadLogFiles();
+    setupInfiniteScroll();
+});
+
+// 1. Загрузка списка файлов
+async function loadLogFiles() {
+    try {
+        const response = await fetch('/api/logs/files');
+        if (response.ok) {
+            const data = await response.json();
+            logFiles = data.files || [];
+            renderFileSelector();
+            // Сразу грузим логи первого файла
+            loadLogsPage(1);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки списка файлов:', error);
+        $('#file-logs-content').html('<div class="text-danger p-3">Ошибка подключения к серверу</div>');
+    }
+}
+
+// 2. Рендер селектора файлов
+function renderFileSelector() {
+    if (logFiles.length === 0) return;
+
+    const html = `
+        <select class="form-select form-select-sm" style="min-width: 200px;"
+                onchange="changeLogFile(this.value)">
+            ${logFiles.map((file, idx) =>
+                `<option value="${idx}" ${idx === currentLogFileIndex ? 'selected' : ''}>${file.name}</option>`
+            ).join('')}
+        </select>
+    `;
+    $('#file-selector-container').html(html);
+}
+
+// 3. Смена файла
+function changeLogFile(index) {
+    currentLogFileIndex = parseInt(index);
+    resetLogs();
+}
+
+// 4. Сброс и перезагрузка
+function resetLogs() {
+    currentPage = 1;
+    hasMoreLogs = true;
+    totalShown = 0;
+    $('#file-logs-content').empty();
+    $('#end-of-logs').hide();
+
+    // Сброс скролла наверх, так как мы смотрим "сверху вниз"
+    $('#logs-container').scrollTop(0);
+
+    loadLogsPage(1);
+}
+
+// 5. Загрузка страницы
+async function loadLogsPage(page) {
+    if (isLoading) return;
+    isLoading = true;
+    $('#loading-indicator').show();
+
+    try {
+        const params = new URLSearchParams({
+            page: page,
+            per_page: PAGE_SIZE,
+            log_file_index: currentLogFileIndex
+        });
+
+        const response = await fetch(`/api/logs/file?${params}`);
+        if (response.ok) {
+            const data = await response.json();
+            const newLines = data.lines || [];
+
+            hasMoreLogs = data.has_more;
+            currentPage = page;
+
+            // Обновляем бейдж информации
+            if (page === 1) {
+                $('#log-status-badge').text(`Всего в файле: ${data.total_lines}`);
+            }
+
+            renderLines(newLines);
+
+            if (!hasMoreLogs) {
+                $('#end-of-logs').show();
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+    } finally {
+        isLoading = false;
+        $('#loading-indicator').hide();
+    }
+}
+
+// 6. Отрисовка строк
+function renderLines(lines) {
+    const container = $('#file-logs-content');
+
+    const html = lines.map(line => {
+        // Определяем цвет
+        let colorStyle = '';
+        for (const [lvl, color] of Object.entries(levelColors)) {
+            if (line.includes(lvl)) {
+                colorStyle = `color: ${color};`;
+                break;
+            }
+        }
+
+        return `<div class="log-line" style="${colorStyle}">${escapeHtml(line)}</div>`;
+    }).join('');
+
+    container.append(html);
+    totalShown += lines.length;
+    $('#shown-lines').text(totalShown);
+}
+
+// 7. Бесконечная прокрутка
+function setupInfiniteScroll() {
+    const container = $('#logs-container');
+    container.on('scroll', function() {
+        const scrollTop = container.scrollTop();
+        const scrollHeight = container[0].scrollHeight;
+        const clientHeight = container[0].clientHeight;
+
+        // Если до конца осталось меньше 100px и есть что грузить
+        if (scrollTop + clientHeight >= scrollHeight - 100) {
+            if (hasMoreLogs && !isLoading) {
+                loadLogsPage(currentPage + 1);
+            }
+        }
+    });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+</script>
+
+<style>
+.log-line {
+    padding: 2px 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+}
+.log-line:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Кастомный скроллбар */
+.log-container::-webkit-scrollbar {
+    width: 10px;
+}
+.log-container::-webkit-scrollbar-track {
+    background: #212529;
+}
+.log-container::-webkit-scrollbar-thumb {
+    background: #495057;
+    border-radius: 5px;
+}
+.log-container::-webkit-scrollbar-thumb:hover {
+    background: #6c757d;
+}
+</style>
+{% endblock %}

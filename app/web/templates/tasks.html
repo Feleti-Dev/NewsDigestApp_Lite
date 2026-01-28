@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+
+{% block title %}Управление задачами - News Digest App{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-play-circle"></i> Управление задачами
+        </h1>
+    </div>
+</div>
+
+<!-- Статус задач -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Статус задач</h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSchedulerStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> Обновить
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- Mutual Exclusion Warning -->
+                <div id="mutual-exclusion-warning" class="alert alert-warning d-none mb-3">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span id="mutual-exclusion-message"></span>
+                </div>
+
+                <div class="row">
+                    <!-- Continuous Scheduler статус -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100" id="card-continuous">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-arrow-repeat"></i> <span
+                                        id="name-continuous">Continuous Scheduler</span>
+                                    <span class="badge bg-secondary" id="badge-continuous">Загрузка...</span>
+                                </h5>
+                                <p class="card-text" id="desc-continuous">
+                                    Непрерывный сбор новостей из каналов
+                                </p>
+                                <p class="card-text">
+                                    <strong>Время запуска:</strong> <span id="start-time-continuous">—</span><br>
+                                    <strong>Uptime:</strong> <span id="uptime-continuous">—</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Single Pass Scheduler статус -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100" id="card-single_pass">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-play-circle"></i> <span
+                                        id="name-single_pass">Single Pass Scheduler</span>
+                                    <span class="badge bg-secondary" id="badge-single_pass">Загрузка...</span>
+                                </h5>
+                                <p class="card-text" id="desc-single_pass">
+                                    Единичный проход по всем каналам
+                                </p>
+                                <p class="card-text">
+                                    <strong>Время запуска:</strong> <span id="start-time-single_pass">—</span><br>
+                                    <strong>Uptime:</strong> <span id="uptime-single_pass">—</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Digest Publisher статус -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100" id="card-digest_publisher">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-calendar-event"></i> <span id="name-digest_publisher">Digest Publisher</span>
+                                    <span class="badge bg-secondary" id="badge-digest_publisher">Загрузка...</span>
+                                </h5>
+                                <p class="card-text" id="desc-digest_publisher">
+                                    Планировщик публикации дайджестов
+                                </p>
+                                <p class="card-text">
+                                    <strong>Время запуска:</strong> <span id="start-time-digest_publisher">—</span><br>
+                                    <strong>Uptime:</strong> <span id="uptime-digest_publisher">—</span>
+                                </p>
+                                <div class="alert alert-secondary">
+                                    <i class="bi bi-calendar3"></i>
+                                    <strong>Расписание:</strong><br>
+                                    <span id="schedule-daily">Ежедневный: загрузка...</span><br>
+                                    <span id="schedule-weekly">Еженедельный: загрузка...</span><br>
+                                    <span id="schedule-monthly">Ежемесячный: загрузка...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sheets Sync статус -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100" id="card-sheets_sync">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-table"></i> <span id="name-sheets_sync">Sheets Sync</span>
+                                    <span class="badge bg-secondary" id="badge-sheets_sync">Загрузка...</span>
+                                </h5>
+                                <p class="card-text" id="desc-sheets_sync">
+                                    Синхронизация с Google Sheets
+                                </p>
+                                <p class="card-text">
+                                    <strong>Время запуска:</strong> <span id="start-time-sheets_sync">—</span><br>
+                                    <strong>Uptime:</strong> <span id="uptime-sheets_sync">—</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Управление планировщиками -->
+<div class="row mb-4">
+    <!-- Управление Continuous Scheduler -->
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-arrow-repeat"></i> Continuous Scheduler
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <p>Непрерывный сбор новостей из каналов. Обходит каналы циклически с заданными интервалами.</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Интервалы:</strong><br>
+                        <span id="interval-twitter">Twitter: загрузка...</span><br>
+                        <span id="interval-telegram">Telegram: загрузка...</span><br>
+                        <span id="interval-youtube">YouTube: загрузка...</span><br>
+                        <span id="interval-reddit">Reddit: загрузка...</span>
+                    </div>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" onclick="controlScheduler('continuous', 'start')">
+                        <i class="bi bi-play-fill"></i> Запустить
+                    </button>
+                    <button class="btn btn-danger btn-lg" onclick="controlScheduler('continuous', 'stop')">
+                        <i class="bi bi-stop-fill"></i> Остановить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Управление Single Pass Scheduler -->
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-play-circle"></i> Single Pass Scheduler
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <p>Единичный проход по всем каналам. Выполняет один цикл сбора и останавливается.</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Интервалы:</strong><br>
+                        <span id="interval-sp-twitter">Twitter: загрузка...</span><br>
+                        <span id="interval-sp-telegram">Telegram: загрузка...</span><br>
+                        <span id="interval-sp-youtube">YouTube: загрузка...</span><br>
+                        <span id="interval-sp-reddit">Reddit: загрузка...</span>
+                    </div>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" onclick="controlScheduler('single_pass', 'start')">
+                        <i class="bi bi-play-fill"></i> Запустить
+                    </button>
+                    <button class="btn btn-danger btn-lg" onclick="controlScheduler('single_pass', 'stop')">
+                        <i class="bi bi-stop-fill"></i> Остановить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Управление Digest Publisher -->
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-event"></i> Digest Publisher
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <p>Планировщик публикации дайджестов. Автоматически формирует и отправляет дайджесты по
+                        расписанию.</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-clock"></i><strong> Расписание:</strong><br>
+                        <strong>Следующий дневной:</strong> <span id="next-daily">загрузка...</span><br>
+                        <strong>Следующий недельный:</strong> <span id="next-weekly">загрузка...</span><br>
+                        <strong>Следующий месячный:</strong> <span id="next-monthly">загрузка...</span>
+                    </div>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-lg" onclick="controlTask('digest', 'force_execute', 'daily')">
+                        <i class="bi bi-send"></i> Запустить дневной дайджест
+                    </button>
+                    <button class="btn btn-primary btn-lg" onclick="controlTask('digest', 'force_execute', 'weekly')">
+                        <i class="bi bi-send"></i> Запустить недельный дайджест
+                    </button>
+                    <button class="btn btn-primary btn-lg" onclick="controlTask('digest', 'force_execute', 'monthly')">
+                        <i class="bi bi-send"></i> Запустить месячный дайджест
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Управление Sheets Sync -->
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-table"></i> Sheets Sync
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <p>Синхронизация списка каналов из Google Sheets.</p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Описание:</strong><br>
+                        Периодически проверяет изменения в Google Sheets и обновляет список отслеживаемых каналов.
+                    </div>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-lg" onclick="controlScheduler('sheets_sync', 'start')">
+                        <i class="bi bi-arrow-repeat"></i> Синхронизировать
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Объект для хранения времени запуска планировщиков
+    const schedulerStartTimes = {};
+
+    // Глобальный интервал для обновления данных
+    let updateInterval;
+
+    // Обновление таймеров каждую секунду
+    setInterval(updateAllUptimes, 1000);
+
+    $(document).ready(function() {
+        // Загружаем конфигурацию и статус
+        loadConfigSettings();
+        loadSchedulerStatus();
+
+        // Устанавливаем глобальный интервал обновления
+        updateInterval = setInterval(function() {
+            loadConfigSettings();
+            loadSchedulerStatus();
+        }, 10000);
+    });
+
+    // Форматирование uptime
+    function formatUptime(seconds) {
+        if (!seconds || seconds < 0) return '—';
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+
+        let parts = [];
+        if (days > 0) parts.push(`${days}д`);
+        if (hours > 0 || days > 0) parts.push(`${hours}ч`);
+        if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}м`);
+        parts.push(`${secs}с`);
+
+        return parts.join(' ');
+    }
+
+    // Обновление всех uptime
+    function updateAllUptimes() {
+        for (const [type, startTime] of Object.entries(schedulerStartTimes)) {
+            if (startTime) {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const uptimeEl = $(`#uptime-${type}`);
+                if (uptimeEl.length) {
+                    uptimeEl.text(formatUptime(elapsed));
+                }
+            }
+        }
+    }
+
+    // Загрузка конфигурации
+    function loadConfigSettings() {
+        $.get('/api/config/settings', function(data) {
+            if (!data.error) {
+                // Обновляем интервалы
+                if (data.intervals) {
+                    if (data.intervals.twitter) {
+                        $("#interval-twitter").text("Twitter: " + data.intervals.twitter);
+                        $("#interval-sp-twitter").text("Twitter: " + data.intervals.twitter);
+                    } else {
+                        $("#interval-twitter").text("Twitter: отключен");
+                        $("#interval-sp-twitter").text("Twitter: отключен");
+                    }
+                    if (data.intervals.telegram) {
+                        $("#interval-telegram").text("Telegram: " + data.intervals.telegram);
+                        $("#interval-sp-telegram").text("Telegram: " + data.intervals.telegram);
+                    }
+                    if (data.intervals.youtube) {
+                        $("#interval-youtube").text("YouTube: " + data.intervals.youtube);
+                        $("#interval-sp-youtube").text("YouTube: " + data.intervals.youtube);
+                    }
+                    if (data.intervals.reddit) {
+                        $("#interval-reddit").text("Reddit: " + data.intervals.reddit);
+                        $("#interval-sp-reddit").text("Reddit: " + data.intervals.reddit);
+                    } else {
+                        $("#interval-reddit").text("Reddit: отключен");
+                        $("#interval-sp-reddit").text("Reddit: отключен");
+                    }
+                }
+
+                // Обновляем расписание и следующие запуски
+                if (data.digest_schedule) {
+                    // Расписание
+                    if (data.digest_schedule.daily) {
+                        $("#schedule-daily").text("Ежедневный: " + data.digest_schedule.daily);
+                        $("#next-daily").text(data.digest_schedule.daily);
+                    }
+                    if (data.digest_schedule.weekly) {
+                        $("#schedule-weekly").text("Еженедельный: " + data.digest_schedule.weekly);
+                        $("#next-weekly").text(data.digest_schedule.weekly);
+                    }
+                    if (data.digest_schedule.monthly) {
+                        $("#schedule-monthly").text("Ежемесячный: " + data.digest_schedule.monthly);
+                        $("#next-monthly").text(data.digest_schedule.monthly);
+                    }
+                }
+            }
+        }).fail(function(xhr, status, error) {
+            const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+            console.error(errorMessage);
+            showDefaultConfig();
+        });
+    }
+
+    // Показать конфигурацию по умолчанию
+    function showDefaultConfig() {
+        $("#interval-twitter").text("Twitter: 15 минут");
+        $("#interval-telegram").text("Telegram: 60 секунд");
+        $("#interval-youtube").text("YouTube: 60 секунд");
+        $("#interval-reddit").text("Reddit: 60 секунд");
+
+        $("#interval-sp-twitter").text("Twitter: 15 минут");
+        $("#interval-sp-telegram").text("Telegram: 60 секунд");
+        $("#interval-sp-youtube").text("YouTube: 60 секунд");
+        $("#interval-sp-reddit").text("Reddit: 60 секунд");
+
+        $("#schedule-daily").text("Ежедневный: 12:00 МСК");
+        $("#schedule-weekly").text("Еженедельный: Воскресенье 12:00 МСК");
+        $("#schedule-monthly").text("Ежемесячный: 28 число 12:00 МСК");
+
+        $("#next-daily").text("12:00 МСК");
+        $("#next-weekly").text("Воскресенье 12:00 МСК");
+        $("#next-monthly").text("28 число 12:00 МСК");
+    }
+
+    // Загрузка статуса планировщиков
+    function loadSchedulerStatus() {
+        $.get('/api/schedulers/status', function(data) {
+            if (data.success && data.schedulers) {
+                // Обновляем статус каждого планировщика
+                for (const [type, status] of Object.entries(data.schedulers)) {
+                    updateSchedulerCard(type, status);
+                }
+
+                // Обновляем предупреждение mutual exclusion
+                const warningEl = $('#mutual-exclusion-warning');
+                const messageEl = $('#mutual-exclusion-message');
+
+                if (data.mutual_exclusion && data.mutual_exclusion.active_scheduler) {
+                    warningEl.removeClass('d-none');
+                    const names = {
+                        'continuous': 'цикличный сборщик',
+                        'single_pass': 'единичный сборщик'
+                    };
+                    messageEl.text(`Сейчас запущен ${names[data.mutual_exclusion.active_scheduler]}. Другой сборщик из этой группы нельзя запустить пока первый не будет остановлен.`);
+                } else {
+                    warningEl.addClass('d-none');
+                }
+            }
+        }).fail(function(xhr, status, error) {
+            const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+            console.error(errorMessage);
+            NewsDigestApp.utils.showToast(errorMessage, 'error');
+            showErrorStatus();
+        });
+    }
+
+    // Обновление карточки планировщика
+    function updateSchedulerCard(type, status) {
+        // Обновляем название и описание
+        const nameEl = $(`#name-${type}`);
+        const descEl = $(`#desc-${type}`);
+        const badgeEl = $(`#badge-${type}`);
+        const cardEl = $(`#card-${type}`);
+        const startTimeEl = $(`#start-time-${type}`);
+
+        if (status.name && nameEl.length) {
+            nameEl.text(status.name);
+        }
+        if (status.description && descEl.length) {
+            descEl.text(status.description);
+        }
+
+        // Обновляем бейдж статуса
+        if (status.running) {
+            badgeEl.removeClass('bg-secondary').addClass('bg-success').text('Запущен');
+            cardEl.removeClass('border-secondary').addClass('border-success');
+
+            // Обновляем время запуска
+            if (status.start_time) {
+                const startDate = new Date(status.start_time);
+                startTimeEl.text(startDate.toLocaleString('ru-RU'));
+                schedulerStartTimes[type] = startDate.getTime();
+            } else {
+                startTimeEl.text(new Date().toLocaleString('ru-RU'));
+                schedulerStartTimes[type] = Date.now();
+            }
+        } else {
+            badgeEl.removeClass('bg-success').addClass('bg-secondary').text('Остановлен');
+            cardEl.removeClass('border-success').addClass('border-secondary');
+            startTimeEl.text('—');
+            delete schedulerStartTimes[type];
+            $(`#uptime-${type}`).text('—');
+        }
+
+        // Обновляем uptime если есть
+        if (status.uptime !== undefined && status.uptime !== null) {
+            $(`#uptime-${type}`).text(formatUptime(status.uptime));
+            if (status.running && status.start_time) {
+                schedulerStartTimes[type] = new Date(status.start_time).getTime();
+            }
+        }
+    }
+
+    // Показать ошибку статуса
+    function showErrorStatus() {
+        const types = ['continuous', 'single_pass', 'digest_publisher', 'sheets_sync'];
+        types.forEach(type => {
+            $(`#badge-${type}`)
+                .removeClass('bg-success bg-secondary')
+                .addClass('bg-danger')
+                .text('Ошибка');
+            $(`#start-time-${type}`).text('Ошибка загрузки');
+            $(`#uptime-${type}`).text('—');
+        });
+    }
+
+    // Управление планировщиком
+    function controlScheduler(schedulerType, action) {
+        if (!confirm(`Вы уверены, что хотите ${action === 'start' ? 'запустить' : 'остановить'} "${schedulerType}"?`)) {
+            return;
+        }
+
+        $.ajax({
+            url: '/api/schedulers/control',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                scheduler_type: schedulerType,
+                action: action
+            }),
+            success: function(response) {
+                if (response.success) {
+                    showToast('success', `${schedulerType} ${action} успешно выполнен`);
+                    loadSchedulerStatus();
+                } else {
+                    showToast('error', response.message || 'Ошибка');
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.message || xhr.responseJSON?.error || 'Ошибка выполнения';
+
+                // Показываем ошибку mutual exclusion
+                if (xhr.status === 400 && xhr.responseJSON?.error_code === 'SCHEDULER_CONFLICT') {
+                    alert('Конфликт планировщиков\n\n' + error);
+                } else {
+                    showToast('error', error);
+                }
+            }
+        });
+    }
+
+    // Управление задачами (для дайджестов)
+    function controlTask(taskType, action, digestType = null) {
+        const data = {
+            task_type: taskType,
+            action: action
+        };
+
+        if (digestType) {
+            data.digest_type = digestType;
+        }
+
+        $.ajax({
+            url: '/api/tasks/control',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                showToast('success', response.message || 'Действие выполнено успешно');
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON?.message || 'Произошла ошибка';
+                showToast('error', errorMsg);
+            }
+        });
+    }
+
+    // Показать уведомление
+    function showToast(type, message) {
+        let toastContainer = $('#toast-container');
+        if (toastContainer.length === 0) {
+            $('body').append('<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>');
+            toastContainer = $('#toast-container');
+        }
+
+        const toastId = 'toast-' + Date.now();
+        const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
+
+        const toastHtml = `
+            <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        `;
+
+        toastContainer.append(toastHtml);
+        const toastElement = $('#' + toastId);
+        const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+        toast.show();
+
+        toastElement.on('hidden.bs.toast', function() {
+            $(this).remove();
+        });
+    }
+
+    // Принудительная синхронизация
+    function forceSync() {
+        if (confirm('Принудительно синхронизировать каналы с Google Sheets?')) {
+            controlTask('sync', 'force');
+        }
+    }
+
+    function exportStats() {
+        alert('Экспорт статистики будет реализован в следующей версии');
+    }
+
+    function restartAll() {
+        if (confirm('Перезапустить все сервисы? Это может занять несколько секунд.')) {
+            alert('Перезапуск будет реализован в следующей версии');
+        }
+    }
+
+    // Остановить интервал при уходе со страницы
+    $(window).on('beforeunload', function() {
+        if (updateInterval) {
+            clearInterval(updateInterval);
+        }
+    });
+</script>
+{% endblock %}

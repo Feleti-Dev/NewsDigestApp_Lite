@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block title %}Все новости{% endblock %}
+
+{% block content %}
+<h1><i class="bi bi-newspaper"></i> Новости</h1>
+
+<!-- Фильтры и поиск -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <!-- Основная статистика -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Общая статистика новостей</h5>
+                        <button class="btn btn-sm btn-primary" onclick="loadStats()">
+                            <i class="bi bi-arrow-clockwise"></i> Обновить
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="overall-stats">
+                            <!-- Заполнится через JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Фильтры</h5>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <!-- Выбор количества новостей на страницу -->
+                    <div class="col-md-3">
+                        <label class="form-label">Новости на страницу</label>
+                        <select class="form-select" id="per-page">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+
+                    <!-- Страница: поле ввода и кнопки -->
+                    <div class="col-md-3 align-items-center">
+                        <label class="form-label">Страница</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <button class="btn btn-outline-secondary" id="prev-page">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+
+                            <input
+                                    type="number"
+                                    id="page-input"
+                                    class="form-control text-center"
+                                    style="max-width: 80px"
+                                    min="1"
+                                    value="1"
+                            >
+
+                            <button class="btn btn-outline-secondary" id="next-page">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+
+                            <p class="text-muted ms-2 fs-5 mb-0"> / <span id="total-pages">1</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Выбор источника новостей -->
+                    <div class="col-md-3 ">
+                        <label class="form-label">Источник</label>
+                        <div class="d-flex gap-3 flex-wrap news-source-list">
+                            <label class="source-toggle">
+                                <input type="checkbox" class="exclude-type" value="telegram" checked>
+                                <span>Telegram</span>
+                            </label>
+                            <label class="source-toggle">
+                                <input type="checkbox" class="exclude-type" value="youtube" checked>
+                                <span>YouTube</span>
+                            </label>
+                            <label class="source-toggle">
+                                <input type="checkbox" class="exclude-type" value="twitter" checked>
+                                <span>Twitter</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Сортировка новостей -->
+                    <div class="col-md-3">
+                        <label class="form-label">Сортировка</label>
+                        <select class="form-select" id="sort-by">
+                            <option value="date">Дата</option>
+                            <option value="source">Источник</option>
+                            <option value="score">Полезность</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<table class="table table-hover">
+    <thead>
+    <tr>
+        <th>Заголовок</th>
+        <th>Источник</th>
+        <th>Оценка</th>
+        <th>Дата</th>
+        <th>Статус</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody id="news-body"></tbody>
+</table>
+
+<nav>
+    <ul class="pagination" id="pagination"></ul>
+</nav>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let page = 1;
+    let totalPages = 1;
+
+    function loadNews() {
+        const perPage = parseInt($('#per-page').val());
+        const sort = $('#sort-by').val();
+        const excludeTypes = $('.exclude-type:not(:checked)')
+            .map((_, el) => el.value)
+            .get();
+
+        $.get('/api/news', {
+            page,
+            per_page: perPage,
+            sort,
+            exclude_types: excludeTypes
+        }, data => {
+            let html = '';
+            data.items.forEach(n => {
+                // Формируем badges для статуса использования
+                const usedBadges = [];
+                if (n.daily_used) usedBadges.push('<span class="badge bg-primary">Д</span>');
+                if (n.weekly_used) usedBadges.push('<span class="badge bg-success">Н</span>');
+                if (n.monthly_used) usedBadges.push('<span class="badge bg-warning">М</span>');
+                const badges = usedBadges.length > 0 ? usedBadges.join(' ') : '<span class="badge bg-secondary">Не исп.</span>';
+
+                // Определяем цвет progress bar
+                const scoreClass = n.score > 0.5 ? 'bg-success' : n.score > 0.3 ? 'bg-warning' : 'bg-danger';
+
+                html += `
+                    <tr>
+                        <td style="width: 50%; word-wrap: break-word; word-break: break-word; white-space: normal;">
+                            <a href="${n.url}" target="_blank" title="${n.headline}">
+                                ${n.headline}
+                            </a>
+                        </td>
+                        <td><span class="badge bg-secondary">${n.source}</span></td>
+                        <td style="width: 10%;">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar ${scoreClass}"
+                                     style="width: ${n.score * 100}%">
+                                    ${n.score.toFixed(4)}
+                                </div>
+                            </div>
+                        </td>
+                        <td>${n.date ? new Date(n.date).toLocaleString('ru-RU') : 'N/A'}</td>
+                        <td>${badges}</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNews(${n.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            $('#news-body').html(html);
+
+            totalPages = Math.max(1, Math.ceil(data.total / perPage));
+            $('#total-pages').text(totalPages);
+            $('#page-input').val(page);
+
+            $('#prev-page').prop('disabled', page <= 1);
+            $('#next-page').prop('disabled', page >= totalPages);
+        }).fail(function(xhr, status, error) {
+            const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+            console.error(errorMessage);
+            NewsDigestApp.utils.showToast(errorMessage, 'error');
+
+            $('#news-body').html(`
+                <tr>
+                    <td colspan="6" class="text-center text-danger">
+                        <i class="bi bi-wifi-off"></i> ${errorMessage}
+                    </td>
+                </tr>
+            `);
+        });
+    }
+      $('#prev-page').on('click', () => {
+          if (page > 1) {
+              page--;
+              loadNews();
+          }
+      });
+
+      $('#next-page').on('click', () => {
+          if (page < totalPages) {
+              page++;
+              loadNews();
+          }
+      });
+
+      $('#page-input').on('change', function () {
+          let val = parseInt(this.value);
+          if (isNaN(val) || val < 1) val = 1;
+          if (val > totalPages) val = totalPages;
+          page = val;
+          loadNews();
+      });
+
+        function deleteNews(id) {
+            if (!confirm('Удалить новость?')) return;
+            $.ajax({
+                url: `/api/news/${id}`,
+                type: 'DELETE',
+                success: () => loadNews()
+            });
+        }
+
+        $('#per-page, #sort-by, .exclude-type').on('change', () => {
+            page = 1;
+            loadNews();
+        });
+
+        $(document).ready(loadNews);
+
+$(document).ready(function() {
+    loadStats();
+    // Обновление каждую минуту
+    setInterval(loadStats, 60000);
+});
+
+function loadStats() {
+    $.get('/api/stats/detailed', function(data) {
+        console.log(data)
+        updateOverallStats(data);
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        console.error(errorMessage);
+        $('#overall-stats').html(`
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="bi bi-wifi-off"></i> ${errorMessage}
+                </div>
+            </div>
+        `);
+    });
+}
+
+function updateOverallStats(data) {
+    if (!data.database) return;
+
+    const html = `
+        <div class="col-md-3">
+            <div class="card bg-primary text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="card-title">${data.database.total_news || 0}</h3>
+                    <p class="card-text">Всего новостей</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="card-title">${data.database.news_with_score || 0}</h3>
+                    <p class="card-text">С оценкой > 0.15</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="card-title">${data.database ? data.database.news_last_24h || 0 : 0}</h3>
+                    <p class="card-text">За 24 часа</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="card-title">${data.database ? (data.database.average_score || 0).toFixed(4) : '0.0000'}</h3>
+                    <p class="card-text">Средняя оценка</p>
+                </div>
+            </div>
+        </div>
+    `;
+    $('#overall-stats').html(html);
+}
+</script>
+{% endblock %}

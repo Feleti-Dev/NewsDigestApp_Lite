@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Отладка - News Digest App{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-bug"></i> Отладка системы
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Проверка менеджеров</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary mb-3" onclick="checkManagers()">
+                    Проверить менеджеры
+                </button>
+                <div id="managers-check-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Проверка API</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary mb-3" onclick="checkAllApis()">
+                    Проверить все API
+                </button>
+                <div id="api-check-result"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Информация о системе</h5>
+            </div>
+            <div class="card-body">
+                <pre id="system-info"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function checkManagers() {
+    $('#managers-check-result').html('<div class="spinner-border spinner-border-sm"></div> Проверка...');
+
+    $.get('/api/system/status', function(data) {
+        let html = '<ul>';
+        html += `<li>DatabaseManager: ${data.database.connected ? '✅' : '❌'}</li>`;
+        html += `<li>ParserManager: ${Object.keys(data.parsers).length > 0 ? '✅' : '❌'}</li>`;
+        html += `<li>Scheduler: ${data.scheduler.continuous ? '✅' : '❌'}</li>`;
+        html += '</ul>';
+        $('#managers-check-result').html(html);
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        console.error(errorMessage);
+        $('#managers-check-result').html(`<div class="alert alert-danger"><i class="bi bi-wifi-off"></i> ${errorMessage}</div>`);
+    });
+}
+
+function checkAllApis() {
+    $('#api-check-result').html('<div class="spinner-border spinner-border-sm"></div> Проверка API...');
+
+    const apis = [
+        { name: 'System Status', url: '/api/system/status' },
+        { name: 'Detailed Stats', url: '/api/stats/detailed' },
+        { name: 'Logs', url: '/api/logs/recent' },
+        { name: 'Channels', url: '/api/channels/list' },
+        { name: 'Tasks Status', url: '/api/tasks/status' },
+        { name: 'Health', url: '/health' }
+    ];
+
+    let results = [];
+    let completed = 0;
+
+    apis.forEach(api => {
+        $.get(api.url, function(data) {
+            results.push(`${api.name}: ✅`);
+            completed++;
+            if (completed === apis.length) {
+                showResults(results);
+            }
+        }).fail(function(xhr) {
+            results.push(`${api.name}: ❌ (${xhr.status})`);
+            completed++;
+            if (completed === apis.length) {
+                showResults(results);
+            }
+        });
+    });
+}
+
+function showResults(results) {
+    let html = '<ul>';
+    results.forEach(result => {
+        html += `<li>${result}</li>`;
+    });
+    html += '</ul>';
+    $('#api-check-result').html(html);
+}
+
+// Загрузка системной информации при открытии страницы
+$(document).ready(function() {
+    const info = {
+        'User Agent': navigator.userAgent,
+        'Platform': navigator.platform,
+        'Cookies Enabled': navigator.cookieEnabled,
+        'Screen Size': `${screen.width}x${screen.height}`,
+        'Window Size': `${window.innerWidth}x${window.innerHeight}`,
+        'Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+        'Current Time': new Date().toString()
+    };
+
+    let infoHtml = '';
+    for (const [key, value] of Object.entries(info)) {
+        infoHtml += `<strong>${key}:</strong> ${value}\n`;
+    }
+    $('#system-info').text(infoHtml);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,687 @@
+{% extends "base.html" %}
+
+{% block title %}News Digest App{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2"></i> Панель управления
+        </h1>
+    </div>
+</div>
+
+<!-- Статус системы -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i> Статус системы
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="system-status-cards">
+                    <!-- Заполнится через JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Панель управления планировщиками -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history"></i> Управление планировщиками
+                </h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSchedulerStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> Обновить
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- Mutual Exclusion Warning -->
+                <div id="mutual-exclusion-warning" class="alert alert-warning d-none mb-3">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span id="mutual-exclusion-message"></span>
+                </div>
+
+                <!-- Сетка планировщиков -->
+                <div class="row" id="scheduler-cards">
+                    <!-- Continuous Scheduler -->
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100" id="scheduler-continuous">
+                            <div class="card-body text-center">
+                                <i class="bi bi-arrow-repeat display-4 text-primary"></i>
+                                <h5 class="card-title mt-2 scheduler-name" data-type="continuous">Цикличный сборщик</h5>
+                                <p class="card-text text-muted small scheduler-description" data-type="continuous">Непрерывный сбор новостей по всем активным каналам</p>
+                                <div id="status-continuous" class="mb-2">
+                                    <span class="badge bg-secondary">Неизвестно</span>
+                                </div>
+                                <div id="uptime-continuous" class="small text-muted mb-3"></div>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-success btn-sm"
+                                            onclick="controlScheduler('continuous', 'start')"
+                                            id="btn-continuous-start">
+                                        <i class="bi bi-play-fill"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                            onclick="controlScheduler('continuous', 'stop')"
+                                            id="btn-continuous-stop">
+                                        <i class="bi bi-stop-fill"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Single Pass Scheduler -->
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100" id="scheduler-single_pass">
+                            <div class="card-body text-center">
+                                <i class="bi bi-play-circle display-4 text-success"></i>
+                                <h5 class="card-title mt-2 scheduler-name" data-type="single_pass">Единичный сборщик</h5>
+                                <p class="card-text text-muted small scheduler-description" data-type="single_pass">Однократный проход по всем каналам</p>
+                                <div id="status-single_pass" class="mb-2">
+                                    <span class="badge bg-secondary">Неизвестно</span>
+                                </div>
+                                <div id="uptime-single_pass" class="small text-muted mb-3"></div>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-success btn-sm"
+                                            onclick="controlScheduler('single_pass', 'start')"
+                                            id="btn-single_pass-start">
+                                        <i class="bi bi-play-fill"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                            onclick="controlScheduler('single_pass', 'stop')"
+                                            id="btn-single_pass-stop">
+                                        <i class="bi bi-stop-fill"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Digest Publisher -->
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100" id="scheduler-digest_publisher">
+                            <div class="card-body text-center">
+                                <i class="bi bi-send display-4 text-info"></i>
+                                <h5 class="card-title mt-2 scheduler-name" data-type="digest_publisher">Планировщик публикаций</h5>
+                                <p class="card-text text-muted small scheduler-description" data-type="digest_publisher">Автоматическая публикация дайджестов по расписанию</p>
+                                <div id="status-digest_publisher" class="mb-2">
+                                    <span class="badge bg-secondary">Неизвестно</span>
+                                </div>
+                                <div id="uptime-digest_publisher" class="small text-muted mb-3"></div>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-success btn-sm"
+                                            onclick="controlScheduler('digest_publisher', 'start')"
+                                            id="btn-digest_publisher-start">
+                                        <i class="bi bi-play-fill"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm"
+                                            onclick="controlScheduler('digest_publisher', 'stop')"
+                                            id="btn-digest_publisher-stop">
+                                        <i class="bi bi-stop-fill"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sheets Sync -->
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100" id="scheduler-sheets_sync">
+                            <div class="card-body text-center">
+                                <i class="bi bi-table display-4 text-warning"></i>
+                                <h5 class="card-title mt-2 scheduler-name" data-type="sheets_sync">Синхронизация с Sheets</h5>
+                                <p class="card-text text-muted small scheduler-description" data-type="sheets_sync">Синхронизация списка каналов из Google Sheets</p>
+                                <div id="status-sheets_sync" class="mb-2">
+                                    <span class="badge bg-secondary">Неизвестно</span>
+                                </div>
+                                <div id="uptime-sheets_sync" class="small text-muted mb-3"></div>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        onclick="controlScheduler('sheets_sync', 'start')"
+                                        id="btn-sheets_sync-start">
+                                    <i class="bi bi-arrow-repeat"></i> Синхронизировать
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Быстрые действия -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning"></i> Быстрые действия
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="btn-group" role="group">
+<!--                    <button type="button" class="btn btn-primary" onclick="forceSync()">-->
+<!--                        <i class="bi bi-arrow-repeat"></i> Синхронизировать каналы-->
+<!--                    </button>-->
+                    <button type="button" class="btn btn-warning" onclick="forceDailyDigest()">
+                        <i class="bi bi-send"></i> Дневной дайджест
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="forceWeeklyDigest()">
+                        <i class="bi bi-send"></i> Недельный дайджест
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="forceMonthlyDigest()">
+                        <i class="bi bi-send"></i> Месячный дайджест
+                    </button>
+<!--                    <button type="button" class="btn btn-danger" onclick="shutdownSystem()">-->
+<!--                        <i class="bi bi-power"></i> Выключить-->
+<!--                    </button>-->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика в реальном времени -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-database"></i> База данных
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="db-stats">
+                    <!-- Заполнится через JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-robot"></i> Парсеры
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="parser-stats">
+                    <!-- Заполнится через JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Последние новости -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-newspaper"></i> Последние новости (топ за 24 часа)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="recent-news-table">
+                        <thead>
+                            <tr>
+                                <th>Заголовок</th>
+                                <th>Источник</th>
+                                <th>Оценка</th>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Заполнится через JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Объект для хранения времени запуска планировщиков
+const schedulerStartTimes = {};
+
+// Обновление таймеров каждую секунду
+setInterval(updateAllUptimes, 1000);
+
+function formatUptime(seconds) {
+    if (!seconds || seconds < 0) return '';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    let parts = [];
+    if (days > 0) parts.push(`${days}д`);
+    if (hours > 0 || days > 0) parts.push(`${hours}ч`);
+    if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}м`);
+    parts.push(`${secs}с`);
+
+    return parts.join(' ');
+}
+
+function updateAllUptimes() {
+    for (const [type, startTime] of Object.entries(schedulerStartTimes)) {
+        if (startTime) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const uptimeEl = $(`#uptime-${type}`);
+            if (uptimeEl.length) {
+                uptimeEl.html(`<i class="bi bi-clock"></i> ${formatUptime(elapsed)}`);
+            }
+        }
+    }
+}
+
+function getSchedulerUptime(startTime) {
+    if (!startTime) return null;
+    return (Date.now() - startTime) / 1000;
+}
+
+// Загрузка данных при открытии страницы
+$(document).ready(function() {
+    loadSystemStatus();
+    loadSchedulerStatus();
+    loadDatabaseStats();
+    loadParserStats();
+    loadRecentNews();
+
+    // Обновление каждые 30 секунд
+    setInterval(loadSystemStatus, 30000);
+    setInterval(loadSchedulerStatus, 30000);
+    setInterval(loadDatabaseStats, 30000);
+    setInterval(loadParserStats, 30000);
+    setInterval(loadRecentNews, 60000);
+});
+
+function loadSystemStatus() {
+    $.get('/api/system/status', function(data) {
+        if (data.error) {
+            NewsDigestApp.utils.showToast(data.error, 'error');
+            $('#system-status-cards').html(`
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Ошибка: ${data.error}
+                    </div>
+                </div>
+            `);
+            return;
+        }
+        const html = `
+            <div class="col-md-3">
+                <div class="card ${data.database.connected ? 'bg-success text-white' : 'bg-danger text-white'}">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">База данных</h6>
+                        <h3>${data.database.connected ? '✓' : '✗'}</h3>
+                        <small>${data.database.news_count} новостей</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Парсеры</h6>
+                        <h3>${Object.keys(data.parsers || {}).length}</h3>
+                        <small>активных</small>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('#system-status-cards').html(html);
+
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        NewsDigestApp.utils.showToast(errorMessage, 'error');
+        $('#system-status-cards').html(`
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="bi bi-wifi-off"></i> ${errorMessage}
+                </div>
+            </div>
+        `);
+    });
+}
+
+function loadSchedulerStatus() {
+    $.get('/api/schedulers/status', function(data) {
+        if (data.success && data.schedulers) {
+            // Обновляем статус каждого планировщика
+            for (const [type, status] of Object.entries(data.schedulers)) {
+                const statusEl = $(`#status-${type}`);
+                const uptimeEl = $(`#uptime-${type}`);
+                const cardEl = $(`#scheduler-${type}`);
+                const nameEl = $(`.scheduler-name[data-type="${type}"]`);
+                const descEl = $(`.scheduler-description[data-type="${type}"]`);
+
+                // Обновляем название и описание из API, если они есть
+                if (status.name && nameEl.length) {
+                    nameEl.text(status.name);
+                }
+                if (status.description && descEl.length) {
+                    descEl.text(status.description);
+                }
+
+                if (status.running) {
+                    statusEl.html('<span class="badge bg-success">Запущен</span>');
+                    cardEl.find('.card').addClass('border-success');
+
+                    // Сохраняем время запуска для клиентского таймера
+                    // Если start_time пришел от сервера, используем его
+                    if (status.start_time) {
+                        schedulerStartTimes[type] = new Date(status.start_time).getTime();
+                    } else if (!schedulerStartTimes[type]) {
+                        // Если start_time нет, но планировщик запущен, начинаем отсчет с текущего момента
+                        schedulerStartTimes[type] = Date.now();
+                    }
+                } else {
+                    statusEl.html('<span class="badge bg-secondary">Остановлен</span>');
+                    cardEl.find('.card').removeClass('border-success');
+                    // Очищаем время запуска при остановке
+                    delete schedulerStartTimes[type];
+                    uptimeEl.html('');
+                }
+            }
+
+            // Обновляем uptime от сервера для точности (если он есть)
+            for (const [type, status] of Object.entries(data.schedulers)) {
+                const uptimeEl = $(`#uptime-${type}`);
+                if (status.running && status.start_time) {
+                    schedulerStartTimes[type] = new Date(status.start_time).getTime();
+                }
+            }
+
+            // Обновляем предупреждение mutual exclusion
+            const warningEl = $('#mutual-exclusion-warning');
+            const messageEl = $('#mutual-exclusion-message');
+
+            if (data.mutual_exclusion && data.mutual_exclusion.active_scheduler) {
+                warningEl.removeClass('d-none');
+                const names = {
+                    'continuous': 'цикличный сборщик',
+                    'single_pass': 'единичный сборщик'
+                };
+                messageEl.text(`Сейчас запущен ${names[data.mutual_exclusion.active_scheduler]}. Другой сборщик из этой группы нельзя запустить пока первый не будет остановлен.`);
+            } else {
+                warningEl.addClass('d-none');
+            }
+        }
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        console.error(errorMessage);
+        NewsDigestApp.utils.showToast(errorMessage, 'error');
+
+        // Показываем ошибку в UI
+        $('#scheduler-cards .col-md-3').each(function() {
+            const card = $(this);
+            const type = card.attr('id')?.replace('scheduler-', '');
+            if (type) {
+                const statusEl = $(`#status-${type}`);
+                statusEl.html('<span class="badge bg-danger">Ошибка соединения</span>');
+            }
+        });
+    });
+}
+
+function controlScheduler(schedulerType, action) {
+    if (!confirm(`Вы уверены, что хотите ${action === 'start' ? 'запустить' : 'остановить'} "${schedulerType}"?`)) {
+        return;
+    }
+
+    $.ajax({
+        url: '/api/schedulers/control',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            scheduler_type: schedulerType,
+            action: action
+        }),
+        success: function(response) {
+            if (response.success) {
+                NewsDigestApp.utils.showToast(`${schedulerType} ${action} успешно выполнен`);
+                loadSchedulerStatus();
+            } else {
+                NewsDigestApp.utils.showToast(response.message || 'Ошибка', 'error');
+            }
+        },
+        error: function(xhr) {
+            const error = xhr.responseJSON?.message || xhr.responseJSON?.error || 'Ошибка выполнения';
+
+            // Показываем ошибку mutual exclusion
+            if (xhr.status === 400 && xhr.responseJSON?.error_code === 'SCHEDULER_CONFLICT') {
+                alert('⚠️ Конфликт планировщиков\n\n' + error);
+            } else {
+                NewsDigestApp.utils.showToast(error, 'error');
+            }
+        }
+    });
+}
+
+function loadDatabaseStats() {
+    $.get('/api/stats/detailed', function(data) {
+        if (data.database) {
+            // Формируем статистику по источникам
+            let sourceStatsHtml = '';
+            if (data.database.source_stats) {
+                const sourceNames = {
+                    'Telegram': 'Telegram',
+                    'Twitter': 'Twitter',
+                    'YouTube': 'YouTube'
+                };
+                sourceStatsHtml = Object.entries(data.database.source_stats)
+                    .map(([source, count]) => `<span class="badge bg-secondary me-1">${sourceNames[source] || source}: ${count}</span>`)
+                    .join('');
+            }
+
+            const html = `
+                <div class="col-12">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Всего новостей:</strong> ${data.database.total_news || 0}</p>
+                            <p class="mb-2"><strong>За последние 24ч:</strong> ${data.database.news_last_24h || 0}</p>
+                            <p class="mb-2"><strong>За последние 7д:</strong> ${data.database.news_last_7d || 0}</p>
+                            <p class="mb-2"><strong>За последние 30д:</strong> ${data.database.news_last_30d || 0}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>С оценкой > 0.15:</strong> ${data.database.news_with_score || 0}</p>
+                            <p class="mb-2"><strong>Средний балл:</strong> ${data.database.average_score ? data.database.average_score.toFixed(4) : 'N/A'}</p>
+                            <p class="mb-2"><strong>Всего каналов:</strong> ${data.database.total_channels || 0} (${data.database.active_channels || 0} активных)</p>
+                        </div>
+                    </div>
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Использовано в дайджестах:</strong></p>
+                            <p class="mb-2"><strong>Дневных:</strong> ${data.database.daily_used || 0}</p>
+                            <p class="mb-2"><strong>Недельных:</strong> ${data.database.weekly_used || 0}</p>
+                            <p class="mb-2"><strong>Месячных:</strong> ${data.database.monthly_used || 0}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>По источникам:</strong></p>
+                            <p class="mb-2">${sourceStatsHtml}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#db-stats').html(html);
+        }
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        console.error(errorMessage);
+        $('#db-stats').html(`
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="bi bi-wifi-off"></i> ${errorMessage}
+                </div>
+            </div>
+        `);
+    });
+}
+
+function loadParserStats() {
+    $.get('/api/stats/detailed', function(data) {
+        if (data.sources && data.sources.length > 0) {
+            let html = '';
+            data.sources.forEach(source => {
+                html += `
+                    <div class="col-md-3 mb-2">
+                        <div class="card">
+                            <div class="card-body p-2">
+                                <h6 class="card-title mb-1">${source.type}</h6>
+                                <p class="mb-1"><small>Каналов: ${source.channels} (${source.active_channels} актив.)</small></p>
+                                <p class="mb-1"><small>Успешно: ${source.success_rate.toFixed(1)}%</small></p>
+                                <p class="mb-0"><small>Новостей: ${source.news_collected}</small></p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            $('#parser-stats').html(html);
+        }
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        console.error(errorMessage);
+        $('#parser-stats').html(`
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="bi bi-wifi-off"></i> ${errorMessage}
+                </div>
+            </div>
+        `);
+    });
+}
+
+function loadRecentNews() {
+    $.get('/api/news/recent', function(data) {
+        if (data.news && data.news.length > 0) {
+            let html = '';
+            data.news.forEach(item => {
+                const usedBadges = [];
+                if (item.daily_used) usedBadges.push('<span class="badge bg-primary">Д</span>');
+                if (item.weekly_used) usedBadges.push('<span class="badge bg-success">Н</span>');
+                if (item.monthly_used) usedBadges.push('<span class="badge bg-warning">М</span>');
+
+                const badges = usedBadges.length > 0 ? usedBadges.join(' ') : '<span class="badge bg-secondary">Не исп.</span>';
+
+                html += `
+                    <tr>
+                        <td>
+                            <a href="${item.url}" target="_blank" title="${item.headline}">
+                                ${item.headline.substring(0, 60)}${item.headline.length > 60 ? '...' : ''}
+                            </a>
+                        </td>
+                        <td><span class="badge bg-secondary">${item.source}</span></td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar ${item.interest_score > 0.5 ? 'bg-success' : item.interest_score > 0.3 ? 'bg-warning' : 'bg-danger'}"
+                                     style="width: ${item.interest_score * 100}%">
+                                    ${item.interest_score.toFixed(4)}
+                                </div>
+                            </div>
+                        </td>
+                        <td>${item.publication_date ? new Date(item.publication_date).toLocaleDateString('ru-RU') : 'N/A'}</td>
+                        <td>${badges}</td>
+                    </tr>
+                `;
+            });
+            $('#recent-news-table tbody').html(html);
+        } else {
+            $('#recent-news-table tbody').html('<tr><td colspan="5" class="text-center">Нет новостей за последние 24 часа</td></tr>');
+        }
+    }).fail(function(xhr, status, error) {
+        const errorMessage = NewsDigestApp.utils.getConnectionErrorMessage(xhr, status, error);
+        console.error(errorMessage);
+        $('#recent-news-table tbody').html(`<tr><td colspan="5" class="text-center text-danger"><i class="bi bi-wifi-off"></i> ${errorMessage}</td></tr>`);
+    });
+}
+
+// Функции управления
+function forceSync() {
+    if (confirm('Принудительно синхронизировать каналы с Google Sheets?')) {
+        controlTask('sync', 'force');
+    }
+}
+
+function forceDailyDigest() {
+    if (confirm('Принудительно запустить дневной дайджест?')) {
+        controlTask('digest', 'force_execute', 'daily');
+    }
+}
+
+function forceWeeklyDigest() {
+    if (confirm('Принудительно запустить недельный дайджест?')) {
+        controlTask('digest', 'force_execute', 'weekly');
+    }
+}
+
+function forceMonthlyDigest() {
+    if (confirm('Принудительно запустить месячный дайджест?')) {
+        controlTask('digest', 'force_execute', 'monthly');
+    }
+}
+
+function controlTask(taskType, action, digestType) {
+    $.ajax({
+        url: '/api/tasks/control',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            task_type: taskType,
+            action: action,
+            digest_type: digestType || 'daily'
+        }),
+        success: function(response) {
+            if (response.success) {
+                NewsDigestApp.utils.showToast(response.message);
+            } else {
+                NewsDigestApp.utils.showToast(response.message || 'Ошибка', 'error');
+            }
+        },
+        error: function(xhr) {
+            const error = xhr.responseJSON?.message || 'Ошибка выполнения';
+            NewsDigestApp.utils.showToast(error, 'error');
+        }
+    });
+}
+
+function shutdownSystem() {
+    if (confirm('Вы уверены, что хотите ВЫКЛЮЧИТЬ систему? Приложение будет полностью остановлено.')) {
+        $.ajax({
+            url: '/api/system/shutdown',
+            method: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    NewsDigestApp.utils.showToast(response.message);
+                    // Показываем уведомление о завершении работы
+                    setTimeout(function() {
+                        alert('Система завершает работу. Обновите страницу для перезапуска приложения.');
+                    }, 1000);
+                } else {
+                    NewsDigestApp.utils.showToast(response.message || 'Ошибка', 'error');
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.message || 'Ошибка выполнения';
+                NewsDigestApp.utils.showToast(error, 'error');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

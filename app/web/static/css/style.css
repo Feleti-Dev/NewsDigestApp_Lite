@@ -1,0 +1,165 @@
+/* Основные стили веб-интерфейса */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    font-weight: 600;
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+    border-top: none;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-weight: 500;
+}
+
+.progress {
+    border-radius: 10px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    border-radius: 10px;
+}
+
+.log-container {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.log-container div {
+    border-bottom: 1px solid #333;
+    padding: 2px 0;
+}
+
+.log-container .text-danger {
+    color: #ff6b6b !important;
+}
+
+.log-container .text-warning {
+    color: #ffd93d !important;
+}
+
+.log-container .text-success {
+    color: #6bcf7f !important;
+}
+
+.log-container .text-info {
+    color: #4ecdc4 !important;
+}
+
+.btn-group .btn {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+.btn-group .btn:last-child {
+    margin-right: 0;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.card, .alert {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .btn-group .btn {
+        margin-right: 0;
+        margin-bottom: 5px;
+        width: 100%;
+    }
+
+    .table-responsive {
+        font-size: 0.9em;
+    }
+}
+
+/* Кастомные цвета */
+.bg-primary { background-color: #4361ee !important; }
+.bg-success { background-color: #4cc9f0 !important; }
+.bg-info { background-color: #3a0ca3 !important; }
+.bg-warning { background-color: #f72585 !important; }
+.bg-danger { background-color: #7209b7 !important; }
+
+.btn-primary { background-color: #4361ee; border-color: #4361ee; }
+.btn-success { background-color: #4cc9f0; border-color: #4cc9f0; }
+.btn-info { background-color: #3a0ca3; border-color: #3a0ca3; }
+.btn-warning { background-color: #f72585; border-color: #f72585; }
+.btn-danger { background-color: #7209b7; border-color: #7209b7; }
+
+.btn-primary:hover { background-color: #3a56d4; border-color: #3a56d4; }
+.btn-success:hover { background-color: #3db5d8; border-color: #3db5d8; }
+.btn-info:hover { background-color: #2d0a7a; border-color: #2d0a7a; }
+.btn-warning:hover { background-color: #d92074; border-color: #d92074; }
+.btn-danger:hover { background-color: #61089e; border-color: #61089e; }
+
+
+/* Свойства для чекбоксов news*/
+
+.news-source-list {
+ padding: .375rem 0;
+ }
+
+.source-toggle {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+
+.source-toggle input {
+    display: none;
+}
+
+.source-toggle span {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #ced4da;
+    transition: all 0.25s ease;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+}
+
+.source-toggle input:checked + span {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13,110,253,.15);
+}
+
+.source-toggle span:hover {
+    transform: translateY(-1px);
+}

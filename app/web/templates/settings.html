@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки - News Digest App{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-gear"></i> Настройки
+        </h1>
+    </div>
+</div>
+
+<!-- Навигация по вкладкам -->
+<ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">
+            <i class="bi bi-sliders"></i> Основные
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="api-tab" data-bs-toggle="tab" data-bs-target="#api" type="button" role="tab" aria-controls="api" aria-selected="false">
+            <i class="bi bi-key"></i> API
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="schedulers-tab" data-bs-toggle="tab" data-bs-target="#schedulers" type="button" role="tab" aria-controls="schedulers" aria-selected="false">
+            <i class="bi bi-clock-history"></i> Планировщики
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="prompts-tab" data-bs-toggle="tab" data-bs-target="#prompts" type="button" role="tab" aria-controls="prompts" aria-selected="false">
+            <i class="bi bi-chat-quote"></i> Промпты
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="parsers-tab" data-bs-toggle="tab" data-bs-target="#parsers" type="button" role="tab" aria-controls="parsers" aria-selected="false">
+            <i class="bi bi-globe"></i> Парсеры
+        </button>
+    </li>
+</ul>
+
+<!-- Содержимое вкладок -->
+<div class="tab-content" id="settingsTabsContent">
+
+    <!-- Вкладка: Основные настройки -->
+    <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-sliders"></i> Основные параметры
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="general-settings-form">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="bypassing_method" class="form-label">Режим работы при запуске программы</label>
+                            <select class="form-select" id="bypassing_method" name="bypassing_method">
+                                <option value="LOOP">LOOP - Непрерывный сбор</option>
+                                <option value="ONCE">ONCE - Единичный сбор</option>
+                                <option value="NONE">NONE - Без запуска сбора</option>
+                            </select>
+                            <div class="form-text">LOOP: сбор идёт циклично. ONCE: однократный проход. NONE: Без запуска сбора</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="model_type" class="form-label">Модель LLM</label>
+                            <select class="form-select" id="model_type" name="model_type">
+                                <option value="LLM_API">LLM API</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="interest_threshold" class="form-label">Порог интереса</label>
+                            <input type="number" class="form-control" id="interest_threshold" name="interest_threshold" step="0.01" min="0" max="1">
+                            <div class="form-text">Минимальный порог для отбора новостей (0.0 - 1.0)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="topic" class="form-label">Тема</label>
+                            <input type="text" class="form-control" id="topic" name="topic">
+                            <div class="form-text">Тематический фокус для сбора новостей</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="max_news_per_channel" class="form-label">Макс. новостей с канала</label>
+                            <input type="number" class="form-control" id="max_news_per_channel" name="max_news_per_channel" min="1">
+                            <div class="form-text">Максимальное количество новостей собираемых c канала за период сбора</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="max_news_per_digest" class="form-label">Макс. новостей в дайджесте</label>
+                            <input type="number" class="form-control" id="max_news_per_digest" name="max_news_per_digest" min="1" max="7">
+                             <div class="form-text">Максимальное количество новостей в дайджесте (Нельзя ставить больше 7)</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="max_news_time_period" class="form-label">Период сбора (часы)</label>
+                            <input type="number" class="form-control" id="max_news_time_period" name="max_news_time_period" min="1">
+                            <div class="form-text">Порог времени публикации новости до текущего часа</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadGeneralSettings()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveGeneralSettings(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Вкладка: API -->
+    <div class="tab-pane fade" id="api" role="tabpanel" aria-labelledby="api-tab">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-key"></i> API ключи и настройки
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="api-settings-form">
+                    <!-- Telegram -->
+                    <h6 class="mt-3 mb-3 text-muted border-bottom pb-2">
+                        <i class="bi bi-telegram"></i> Telegram
+                    </h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="telegram_bot_token" class="form-label">Bot Token</label>
+                            <input type="text" class="form-control" id="telegram_bot_token" name="telegram_bot_token">
+                            <div class="form-text">Токен бота от BotFather</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="telegram_channel_id" class="form-label">Channel ID</label>
+                            <input type="text" class="form-control" id="telegram_channel_id" name="telegram_channel_id">
+                            <div class="form-text">ID канала для публикации (@channel_name)</div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="telegram_api_id" class="form-label">API ID</label>
+                            <input type="text" class="form-control" id="telegram_api_id" name="telegram_api_id">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="telegram_api_hash" class="form-label">API Hash</label>
+                            <input type="text" class="form-control" id="telegram_api_hash" name="telegram_api_hash">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="telegram_phone" class="form-label">Телефон</label>
+                            <input type="text" class="form-control" id="telegram_phone" name="telegram_phone">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="telegram_2fa_password" class="form-label">2FA пароль</label>
+                        <input type="password" class="form-control" id="telegram_2fa_password" name="telegram_2fa_password" placeholder="Оставьте пустым если нет">
+                    </div>
+
+                    <!-- Twitter/X -->
+                    <h6 class="mt-4 mb-3 text-muted border-bottom pb-2">
+                        <i class="bi bi-twitter"></i> Twitter/X
+                    </h6>
+                    <div class="mb-3">
+                        <label for="twitter_bearer_token" class="form-label">Bearer Token</label>
+                        <input type="text" class="form-control" id="twitter_bearer_token" name="twitter_bearer_token">
+                        <div class="form-text">Twitter API v2 Bearer Token</div>
+                    </div>
+
+                    <!-- YouTube -->
+                    <h6 class="mt-4 mb-3 text-muted border-bottom pb-2">
+                        <i class="bi bi-youtube"></i> YouTube
+                    </h6>
+                    <div class="mb-3">
+                        <label for="youtube_api_key" class="form-label">API Key</label>
+                        <input type="text" class="form-control" id="youtube_api_key" name="youtube_api_key">
+                        <div class="form-text">YouTube Data API v3 Key</div>
+                    </div>
+
+                    <!-- Groq -->
+                    <h6 class="mt-4 mb-3 text-muted border-bottom pb-2">
+                        <i class="bi bi-cpu"></i> Groq (LLM)
+                    </h6>
+                    <div class="mb-3">
+                        <label for="groq_api_key" class="form-label">API Key</label>
+                        <input type="text" class="form-control" id="groq_api_key" name="groq_api_key">
+                        <div class="form-text">Groq API Key для обработки LLM</div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadApiSettings()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveApiSettings(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Вкладка: Планировщики -->
+    <div class="tab-pane fade" id="schedulers" role="tabpanel" aria-labelledby="schedulers-tab">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-day"></i> Ежедневный дайджест
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="daily-digest-form">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="daily_hour" class="form-label">Время публикации (ЧЧ:ММ)</label>
+                            <input type="time" class="form-control" id="daily_hour" name="daily_hour">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="daily_enabled" class="form-label">Статус</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="daily_enabled" name="daily_enabled">
+                                <label class="form-check-label" for="daily_enabled">Включён</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadDailyDigest()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveDailyDigest(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-week"></i> Еженедельный дайджест
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="weekly-digest-form">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="weekly_day" class="form-label">День недели</label>
+                            <select class="form-select" id="weekly_day" name="weekly_day">
+                                <option value="0">Понедельник</option>
+                                <option value="1">Вторник</option>
+                                <option value="2">Среда</option>
+                                <option value="3">Четверг</option>
+                                <option value="4">Пятница</option>
+                                <option value="5">Суббота</option>
+                                <option value="6">Воскресенье</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="weekly_hour" class="form-label">Время (ЧЧ:ММ)</label>
+                            <input type="time" class="form-control" id="weekly_hour" name="weekly_hour">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="weekly_enabled" class="form-label">Статус</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="weekly_enabled" name="weekly_enabled">
+                                <label class="form-check-label" for="weekly_enabled">Включён</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadWeeklyDigest()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveWeeklyDigest(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-month"></i> Ежемесячный дайджест
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="monthly-digest-form">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="monthly_day" class="form-label">День месяца (1-28)</label>
+                            <input type="number" class="form-control" id="monthly_day" name="monthly_day" min="1" max="28">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="monthly_hour" class="form-label">Время (ЧЧ:ММ)</label>
+                            <input type="time" class="form-control" id="monthly_hour" name="monthly_hour">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="monthly_enabled" class="form-label">Статус</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="monthly_enabled" name="monthly_enabled">
+                                <label class="form-check-label" for="monthly_enabled">Включён</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadMonthlyDigest()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveMonthlyDigest(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Вкладка: Промпты -->
+    <div class="tab-pane fade" id="prompts" role="tabpanel" aria-labelledby="prompts-tab">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-chat-quote"></i> Промпты LLM
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="prompts-form">
+                    <div class="mb-3">
+                        <label for="ad_detection_prompt" class="form-label">Обнаружение рекламы</label>
+                        <textarea class="form-control" id="ad_detection_prompt" name="ad_detection_prompt" rows="6"></textarea>
+                        <div class="form-text">Промпт для определения рекламного контента</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="interest_scoring_prompt" class="form-label">Оценка интереса</label>
+                        <textarea class="form-control" id="interest_scoring_prompt" name="interest_scoring_prompt" rows="6"></textarea>
+                        <div class="form-text">Промпт для оценки релевантности новостей</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="digest_processing_prompt" class="form-label">Обработка дайджеста</label>
+                        <textarea class="form-control" id="digest_processing_prompt" name="digest_processing_prompt" rows="6"></textarea>
+                        <div class="form-text">Промпт для формирования дайджестов</div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadPrompts()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="savePrompts(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Вкладка: Парсеры -->
+    <div class="tab-pane fade" id="parsers" role="tabpanel" aria-labelledby="parsers-tab">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-globe"></i> Статус парсеров
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="parsers-form">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="twitter_enabled" class="form-label">Twitter</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="twitter_enabled" name="twitter_enabled">
+                                <label class="form-check-label" for="twitter_enabled">Включён</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="telegram_enabled" class="form-label">Telegram</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="telegram_enabled" name="telegram_enabled">
+                                <label class="form-check-label" for="telegram_enabled">Включён</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="youtube_enabled" class="form-label">YouTube</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="youtube_enabled" name="youtube_enabled">
+                                <label class="form-check-label" for="youtube_enabled">Включён</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadParsersStatus()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveParsersStatus(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Интервалы сбора -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-stopwatch"></i> Интервалы сбора (секунды)
+                </h5>
+                <span class="badge bg-info">Требуется перезапуск</span>
+            </div>
+            <div class="card-body">
+                <form id="intervals-form">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="interval_twitter" class="form-label">Twitter (сек)</label>
+                            <input type="number" class="form-control" id="interval_twitter" name="interval_twitter" min="5">
+                            <div class="form-text">Интервал прохода между каналами X(Twitter), не ставьте ниже 900 сек без подписки на API </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="interval_telegram" class="form-label">Telegram (сек)</label>
+                            <input type="number" class="form-control" id="interval_telegram" name="interval_telegram" min="5">
+                            <div class="form-text">Интервал прохода между каналами Telegram </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="interval_youtube" class="form-label">YouTube (сек)</label>
+                            <input type="number" class="form-control" id="interval_youtube" name="interval_youtube" min="5">
+                            <div class="form-text">Интервал прохода между каналами YouTube </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="loadIntervals()">
+                            <i class="bi bi-arrow-clockwise"></i> Сбросить
+                        </button>
+                        <button type="submit" class="btn btn-primary" onclick="saveIntervals(event)">
+                            <i class="bi bi-check-lg"></i> Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Модальное окно подтверждения -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Подтверждение</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Вы уверены?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmModalBtn">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/settings.js"></script>
+{% endblock %}

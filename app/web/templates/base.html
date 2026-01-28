@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}News Digest App{% endblock %}</title>
+
+    <!-- Favicon для всех устройств -->
+    <link rel="icon" type="image/png" sizes="16x16" href="../static/favicons/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../static/favicons/favicon-32x32.png">
+    <link rel="icon" type="image/svg+xml" href="../static/favicons/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="../static/favicons/apple-touch-icon.png">
+    <link rel="manifest" href="../static/favicons/site.webmanifest">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.3s ease;
+        }
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+        }
+        .main-content {
+            padding: 30px;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+        .card-header {
+            background: #fff;
+            border-bottom: 1px solid #eee;
+            border-radius: 12px 12px 0 0 !important;
+            padding: 16px 20px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .table {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table thead th {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+        }
+        .progress {
+            border-radius: 4px;
+        }
+        .btn {
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+        }
+        /* Toast container */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        #toast-container .toast {
+            min-width: 300px;
+            margin-bottom: 10px;
+        }
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse show">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'web.index' or request.endpoint == 'web.dashboard' %}active{% endif %}" href="/">
+                                <i class="bi bi-speedometer2"></i> Панель
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'web.news_page' %}active{% endif %}" href="/news">
+                                <i class="bi bi-newspaper"></i> Новости
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'web.channels_page' %}active{% endif %}" href="/channels">
+                                <i class="bi bi-hash"></i> Каналы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'web.tasks_page' %}active{% endif %}" href="/tasks">
+                                <i class="bi bi-list-task"></i> Задачи
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'web.logs_page' %}active{% endif %}" href="/logs">
+                                <i class="bi bi-journal-text"></i> Логи
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'web.settings_page' %}active{% endif %}" href="/settings">
+                                <i class="bi bi-gear"></i> Настройки
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- NewsDigestApp namespace -->
+    <script>
+        var NewsDigestApp = {
+            utils: {
+                /**
+                 * Определяет, является ли ошибка ошибкой соединения
+                 * @param {Object} xhr - XMLHttpRequest объект
+                 * @param {string} status - статус ошибки
+                 * @returns {boolean}
+                 */
+                isConnectionError: function(xhr, status) {
+                    return !navigator.onLine ||
+                           xhr.status === 0 ||
+                           status === 'error' ||
+                           status === 'timeout' ||
+                           status === 'abort';
+                },
+
+                /**
+                 * Получает сообщение об ошибке соединения
+                 * @param {Object} xhr - XMLHttpRequest объект
+                 * @param {string} status - статус ошибки
+                 * @param {string} error - текст ошибки
+                 * @returns {string}
+                 */
+                getConnectionErrorMessage: function(xhr, status, error) {
+                    if (this.isConnectionError(xhr, status)) {
+                        return 'Не удалось подключиться к серверу. Проверьте, запущен ли бэкенд.';
+                    }
+                    return error || status || 'Произошла неизвестная ошибка';
+                },
+
+                showToast: function(message, type = 'success') {
+                    const toastId = 'toast-' + Date.now();
+                    const bgClass = type === 'success' ? 'bg-success' :
+                                   type === 'error' ? 'bg-danger' :
+                                   type === 'warning' ? 'bg-warning' : 'bg-info';
+
+                    const toastHtml = `
+                        <div id="${toastId}" class="toast ${bgClass} text-white fade-in" role="alert">
+                            <div class="toast-header ${bgClass} text-white">
+                                <strong class="me-auto">${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}</strong>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                            </div>
+                            <div class="toast-body">${message}</div>
+                        </div>
+                    `;
+
+                    $('#toast-container').append(toastHtml);
+                    const toast = new bootstrap.Toast(document.getElementById(toastId));
+                    toast.show();
+
+                    $('#' + toastId).on('hidden.bs.toast', function() {
+                        $(this).remove();
+                    });
+                }
+            }
+        };
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
