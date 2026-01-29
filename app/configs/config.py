@@ -21,7 +21,7 @@ class GoogleSheetsConfig:
     credentials_path: str = os.getenv(
         "GOOGLE_SHEETS_CREDENTIALS_PATH", "./data/credentials/google_credentials.json"
     )
-    spreadsheet_id: str = os.getenv("GOOGLE_SPREADSHEET_ID", "")
+    google_spreadsheet_id: str = os.getenv("GOOGLE_SPREADSHEET_ID", "")
     sheets_mapping: dict = field(
         default_factory=lambda: {
             "X(Twitter)": "twitter",
@@ -218,7 +218,6 @@ class Config:
             if section == 'app':
                 self.app.update_from_dict(updates)
             elif section == 'scheduler':
-
                 if 'daily_digest' in updates:
                     self.scheduler.update_digest_schedule('daily', updates['daily_digest'])
                 if 'weekly_digest' in updates:
@@ -229,6 +228,8 @@ class Config:
                 for key, value in updates.items():
                     if hasattr(self.api, key):
                         setattr(self.api, key, value)
+                    elif hasattr(self.google_sheets, key):
+                        setattr(self.google_sheets, key, value)
                     else:
                         logger.warning(f"Спорная Api настройка: {key}:{value}")
             elif section == 'parsers':

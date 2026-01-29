@@ -772,7 +772,8 @@ async def settings_api():
             'telegram_phone': config.api.telegram_phone,
             'twitter_bearer_token': config.api.twitter_bearer_token,
             'youtube_api_key': config.api.youtube_api_key,
-            'groq_api_key': config.api.groq_api_key
+            'groq_api_key': config.api.groq_api_key,
+            'google_spreadsheet_id': config.google_sheets.google_spreadsheet_id,
         }
 
         return jsonify({

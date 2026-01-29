@@ -16,7 +16,6 @@ class GoogleSheetsClient:
 
     def __init__(self):
         self.credentials_path = config.google_sheets.credentials_path
-        self.spreadsheet_id = config.google_sheets.spreadsheet_id
         self.service = None
         self._authenticate()
 
@@ -65,7 +64,7 @@ class GoogleSheetsClient:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=self.spreadsheet_id, range=full_range)
+                .get(spreadsheetId=config.google_sheets.google_spreadsheet_id, range=full_range)
                 .execute()
             )
 
@@ -87,13 +86,13 @@ class GoogleSheetsClient:
 
     def get_available_sheets(self) -> Dict[str, str]:
         """Получение списка доступных листов в таблице"""
-        if not self.service or not self.spreadsheet_id:
+        if not self.service or not config.google_sheets.google_spreadsheet_id:
             return {}
 
         try:
             spreadsheet = (
                 self.service.spreadsheets()
-                .get(spreadsheetId=self.spreadsheet_id)
+                .get(spreadsheetId=config.google_sheets.google_spreadsheet_id)
                 .execute()
             )
 

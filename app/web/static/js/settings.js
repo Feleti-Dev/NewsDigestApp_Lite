@@ -63,6 +63,7 @@ function loadApiSettings() {
     $.get('/api/settings/api', function(data) {
         if (data.success && data.api) {
             const a = data.api;
+            $('#google_spreadsheet_id').val(a.google_spreadsheet_id || '');
             $('#telegram_bot_token').val(a.telegram_bot_token || '');
             $('#telegram_channel_id').val(a.telegram_channel_id || '');
             $('#telegram_api_id').val(a.telegram_api_id || '');
@@ -87,7 +88,8 @@ function saveApiSettings(e) {
         TELEGRAM_PHONE: $('#telegram_phone').val(),
         TWITTER_BEARER_TOKEN: $('#twitter_bearer_token').val(),
         YOUTUBE_API_KEY: $('#youtube_api_key').val(),
-        GROQ_API_KEY: $('#groq_api_key').val()
+        GROQ_API_KEY: $('#groq_api_key').val(),
+        GOOGLE_SPREADSHEET_ID: $('#google_spreadsheet_id').val()
     }}, 'API настройки сохранены', loadApiSettings);
 }
 
