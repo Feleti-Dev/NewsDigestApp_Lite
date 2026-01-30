@@ -30,7 +30,7 @@ class TelegramPublisher:
             self.channel_id = cid if cid.startswith("-") else f"-100{cid}"
             self.thread_id = int(tid)
         else:
-            self.channel_id = raw_channel_id if raw_channel_id.startswith("-") else f"-100{raw_channel_id}"
+            self.channel_id = self.channel_id if self.channel_id.startswith("-") else f"-100{self.channel_id}"
             self.thread_id = None
 
         # Настройки повторных попыток
