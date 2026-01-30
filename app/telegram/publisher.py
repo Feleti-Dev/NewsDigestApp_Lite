@@ -21,6 +21,18 @@ class TelegramPublisher:
         self.channel_id = config.api.telegram_channel_id
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
 
+        # Парсим ID канала и ID топика
+        if "@" in self.channel_id:
+            pass
+        elif "/" in self.channel_id:
+            cid, tid = self.channel_id.split("/")
+            # Добавляем -100, если его нет (для закрытых каналов)
+            self.channel_id = cid if cid.startswith("-") else f"-100{cid}"
+            self.thread_id = int(tid)
+        else:
+            self.channel_id = raw_channel_id if raw_channel_id.startswith("-") else f"-100{raw_channel_id}"
+            self.thread_id = None
+
         # Настройки повторных попыток
         self.max_retries = 3
         self.retry_delay = 5  # секунды
@@ -113,6 +125,9 @@ class TelegramPublisher:
                     'parse_mode': 'HTML',
                     'disable_web_page_preview': 'false'
                 }
+                # ДОБАВЬТЕ ЭТО:
+                if self.thread_id:
+                    params['message_thread_id'] = self.thread_id
 
                 # Отправляем запрос
                 async with aiohttp.ClientSession() as session:
@@ -267,6 +282,10 @@ class TelegramPublisher:
                     'parse_mode': parse_mode,
                     'disable_web_page_preview': 'false'
                 }
+                # ДОБАВЬТЕ ЭТО:
+                if self.thread_id:
+                    params['message_thread_id'] = self.thread_id
+
                 # Отправляем запрос
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url, params=params, timeout=30) as response:
