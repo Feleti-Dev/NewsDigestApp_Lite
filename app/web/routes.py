@@ -695,17 +695,17 @@ async def control_task():
         elif task_type == 'digest':
             digest_type = data.get('digest_type', 'daily')
             if action == 'force_execute':
-                if not digest_scheduler:
+                if not digest_scheduler or not digest_scheduler.telegram_publisher:
                     return jsonify({
                         'success': False,
-                        'message': 'DigestScheduler не инициализирован'
+                        'message': 'DigestScheduler или Telegram_Publisher не инициализирован'
                     }), 500
 
                 # Запускаем дайджест как background task
                 asyncio.create_task(_force_execute_digest(digest_scheduler, digest_type))
                 return jsonify({
                     'success': True,
-                    'message': f'Дайджест {digest_type} запущен'
+                    'message': f'Запрос на дайджест {digest_type} запущен'
                 })
 
         elif task_type == 'sync':

@@ -26,7 +26,6 @@ class DigestScheduler:
     def __init__(self, schedule_publish=True):
         self.scheduler: Optional[AsyncIOScheduler] = None
         self.digest_creator = DigestCreator()
-        self.telegram_publisher = TelegramPublisher()
         self.db_manager = DatabaseManager()
         self.moscow_tz = pytz.timezone('Europe/Moscow')
         self.schedule_publish = schedule_publish
@@ -41,6 +40,11 @@ class DigestScheduler:
         # Флаги для статистики
         self.start_time = None
         self.is_running = False
+
+        try:
+            self.telegram_publisher = TelegramPublisher()
+        except Exception as e:
+            self.telegram_publisher = None
 
     async def start(self):
         """Запуск планировщика"""
@@ -162,6 +166,10 @@ class DigestScheduler:
             digest_type: Тип дайджеста ('daily', 'weekly', 'monthly')
             is_test: Флаг тестового режима
         """
+        if self.telegram_publisher is None:
+            logger.error(f"Невозможно запустить дайджест без данных телеграмма")
+            return
+
         # Проверка на параллельное выполнение
         if self.is_processing:
             logger.warning(f"⚠️  Дайджест {digest_type} уже выполняется, пропускаем")

@@ -82,8 +82,8 @@ class TelegramParser(BaseParser):
             return self._two_fa_password
 
         # Пробуем из переменной окружения
-        env_password = os.getenv('TELEGRAM_2FA_PASSWORD')
-        if env_password:
+        env_password = os.getenv('TELEGRAM_2FA_PASSWORD', "")
+        if env_password and env_password != "":
             logger.info("Пароль 2FA загружен из переменной окружения TELEGRAM_2FA_PASSWORD")
             return env_password
 
@@ -92,20 +92,23 @@ class TelegramParser(BaseParser):
 
     def _code_callback(self) -> str:
         """Колбэк для получения кода из консоли (интерактивный режим)"""
-        return input("Введите код из Telegram: ")
+        logger.info(f"Введите код из Telegram: ")
+        return input()
 
     def _password_callback(self) -> str:
         """Колбэк для получения пароля 2FA из консоли (интерактивный режим)"""
         password = self._get_2fa_password()
         if password:
             return password
-        return getpass.getpass("Введите пароль 2FA: ")
+        logger.info(f"Введите пароль 2FA: ")
+        return getpass.getpass()
 
     def _phone_callback(self) -> str:
         """Колбэк для получения номера телефона"""
-        if self._phone:
+        if self._phone and self._phone != "":
             return self._phone
-        return input("Введите номер телефона (+79001234567): ")
+        logger.info(f"Введите номер телефона (375291234567): ")
+        return input()
 
     async def _authenticate(self) -> bool:
         """
@@ -131,7 +134,7 @@ class TelegramParser(BaseParser):
             # Если есть пароль 2FA, используем start с паролем
             two_fa_password = self._get_2fa_password()
 
-            if phone != "" and two_fa_password != "":
+            if phone and two_fa_password and phone != "" and two_fa_password != "":
                 # Полный автоматический режим: телефон и 2FA пароль известны
                 try:
                     await self.client.send_code_request(phone)
@@ -156,7 +159,7 @@ class TelegramParser(BaseParser):
                         logger.error("Требуется пароль 2FA, но он не настроен")
                         return False
 
-            elif phone != "":
+            elif phone and phone != "":
                 # Есть телефон, но нет 2FA пароля - может 2FA не включен
                 try:
                     await self.client.send_code_request(phone)
@@ -177,9 +180,9 @@ class TelegramParser(BaseParser):
             else:
                 # Нет номера телефона в конфигурации - полностью интерактивный режим
                 await self.client.start(
-                    phone=self._phone_callback,
-                    password=self._password_callback,
-                    code_callback=self._code_callback,
+                    phone=self._phone_callback(),
+                    password=self._password_callback(),
+                    code_callback=self._code_callback(),
                 )
                 logger.info("Авторизация успешна (интерактивный режим)")
                 return True

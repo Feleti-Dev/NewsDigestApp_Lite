@@ -4,3 +4,7 @@ data/
 docker/
 tests/
 alembic/
+python_dist/
+.idea/
+*.pyc
+*.env
