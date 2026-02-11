@@ -1,3 +1,4 @@
+.env
 venv/
 credentials/
 data/
@@ -8,3 +9,5 @@ python_dist/
 .idea/
 *.pyc
 *.env
+google_credentials.json
+prompts.json
