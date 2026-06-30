@@ -832,13 +832,18 @@ async def settings_config():
             'monthly': app_config.scheduler.monthly_digest
         }
 
+        parser_schedule = {
+            'daily_single_pass': app_config.scheduler.daily_single_pass,
+        }
+
         return jsonify({
             'success': True,
             'config': {
                 'app': app_settings,
                 'intervals': intervals,
                 'parser_status': parser_status,
-                'digest_schedule': digest_schedule
+                'digest_schedule': digest_schedule,
+                'parser_schedule': parser_schedule,
             },
             'timestamp': datetime.now().isoformat()
         })

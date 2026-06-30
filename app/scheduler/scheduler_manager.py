@@ -8,11 +8,15 @@ from asyncio import Task
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
+import pytz
+from app.configs import config
 from app.parsers import ParserManager
 from app.scheduler import SheetsSyncManager
 from app.scheduler.continuous_scheduler import ContinuousScheduler
 from app.scheduler.digest_scheduler import DigestScheduler
 from app.scheduler.single_pass_scheduler import SinglePassScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +107,36 @@ class SchedulerManager:
         else:
             logger.warning(f"⚠️ Неизвестный режим работы: {bypassing_method}")
 
+        # Запланированные задачи
+        self.start_cron()
+
         logger.info("✅ SchedulerManager полностью инициализирован")
+
+    async def start_cron(self):
+        """Запуск планировщика"""
+        logger.info("🚀 Запуск планировщика проходов...")
+
+        # Инициализация планировщика
+        self.scheduler = AsyncIOScheduler(timezone=pytz.timezone('Europe/Moscow'))
+
+        if config.scheduler.daily_single_pass["enabled"]:
+            # 1. ЕЖЕДНЕВНЫЙ проход
+            self.scheduler.add_job(
+                self.start_single_pass(),
+                trigger=CronTrigger(hour=config.scheduler.daily_single_pass["hour"],
+                                    minute=config.scheduler.daily_single_pass["minute"]),
+                id='daily_single_pass',
+                name=f'Ежедневный проход в {config.scheduler.daily_single_pass["hour"]:02d}:{config.scheduler.daily_single_pass["minute"]:02d} МСК',
+                replace_existing=True,
+                misfire_grace_time=30,
+                max_instances=1
+            )
+
+        # Запуск планировщика
+        self.scheduler.start()
+        logger.info("✅ Планировщик проходов запущен")
+
+
 
     def _create_digest_scheduler(self):
         """Создание DigestScheduler"""

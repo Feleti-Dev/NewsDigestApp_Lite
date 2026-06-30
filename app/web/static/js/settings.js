@@ -24,6 +24,7 @@ function loadAllSettings() {
     loadDailyDigest();
     loadWeeklyDigest();
     loadMonthlyDigest();
+    loadDailySinglePass();
     loadIntervals();
     loadPrompts();
     loadParsersStatus();
@@ -171,6 +172,35 @@ function saveMonthlyDigest(e) {
         })
     }}, 'Ежемесячный дайджест сохранён', loadMonthlyDigest);
 }
+
+// Ежедневный проход
+function loadDailySinglePass() {
+    $.get('/api/settings/config', function(data) {
+        if (data.success && data.config) {
+            const d = data.config.parser_schedule.daily_single_pass;
+            if (d) {
+                $('#daily-single-pass_hour').val(String(d.hour).padStart(2,'0') + ':' + String(d.minute).padStart(2,'0'));
+                $('#daily-single-pass_enabled').prop('checked', d.enabled !== false);
+            }
+        }
+    }).fail(function(xhr) { showToast(xhr.responseJSON?.message || 'Ошибка', 'error'); });
+}
+
+function saveDailySinglePass(e) {
+    e.preventDefault();
+    saveSettings('/api/settings/save', { section: 'scheduler', config_updates: {
+        DAILY_SINGLE_PASS: JSON.stringify({
+            hour: parseInt($('#daily-single-pass_hour').val().split(':')[0]),
+            minute: parseInt($('#daily-single-pass_hour').val().split(':')[1]),
+            enabled: $('#daily-single-pass_enabled').is(':checked')
+        })
+    }}, 'Ежедневный дайджест сохранён', loadDailySinglePass);
+}
+
+
+
+
+
 
 // Интервалы сбора
 function loadIntervals() {

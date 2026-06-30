@@ -155,6 +155,9 @@ class SchedulerConfig:
     stats_window: int = 100  # Количество запросов для расчета статистики
     min_requests_for_stats: int = 10  # Минимальное количество запросов для статистики
 
+    # Время автопарсера
+    daily_single_pass = json.loads(os.getenv("DAILY_SINGLE_PASS", "{}"))
+
     # Время публикации
     daily_digest = json.loads(os.getenv("DAILY_DIGEST", "{}"))
     weekly_digest = json.loads(os.getenv("WEEKLY_DIGEST", "{}"))
@@ -198,6 +201,8 @@ class SchedulerConfig:
             self.weekly_digest.update(json.loads(schedule))
         elif digest_type == 'monthly':
             self.monthly_digest.update(json.loads(schedule))
+        elif digest_type == 'daily_single_pass':
+            self.daily_single_pass.update(json.loads(schedule))
 
 class Config:
     """Главный класс конфигурации"""
@@ -224,6 +229,8 @@ class Config:
                     self.scheduler.update_digest_schedule('weekly', updates['weekly_digest'])
                 if 'monthly_digest' in updates:
                     self.scheduler.update_digest_schedule('monthly', updates['monthly_digest'])
+                if  "daily_single_pass" in updates:
+                    self.scheduler.update_digest_schedule('daily_single_pass', updates['daily_single_pass'])
             elif section == 'api':
                 for key, value in updates.items():
                     if hasattr(self.api, key):
