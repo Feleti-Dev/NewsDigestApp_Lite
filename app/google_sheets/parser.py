@@ -95,8 +95,10 @@ class SheetsParser:
         try:
             if source_type == "telegram":
                 # Пример: https://t.me/channelname
-                match = re.search(r"t\.me/([a-zA-Z0-9_]+)", url)
-                return match.group(1) if match else None
+                match = re.search(r"t\.me/(.+)", url)
+                if "c/" in match.group(1):
+                    return "-100"+match.group(1)[2:]
+                return str(match.group(1).strip("/")) if match else None
 
             elif source_type == "youtube":
                 # Пример: https://www.youtube.com/@channelname или https://youtube.com/channel/UC...

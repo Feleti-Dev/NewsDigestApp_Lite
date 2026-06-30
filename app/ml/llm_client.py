@@ -16,6 +16,17 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 
+blocked_models = [
+"canopylabs/orpheus-arabic-saudi",
+"canopylabs/orpheus-v1-english",
+"groq/compound-mini",
+"llama-3.1-8b-instant",
+"meta-llama/llama-prompt-guard-2-22m",
+"meta-llama/llama-prompt-guard-2-86m",
+"openai/gpt-oss-safeguard-20b",
+"whisper-large-v3",
+"whisper-large-v3-turbo"]
+
 def get_available_groq_models(api_key: str) -> List[str]:
     """
     Получение списка доступных моделей Groq
@@ -38,15 +49,17 @@ def get_available_groq_models(api_key: str) -> List[str]:
 
         data = response.json()
         models = [model["id"] for model in data.get("data", [])]
+        allowed_models = list(set(models) - set(blocked_models))
 
-        logger.debug(f"Найдено доступных моделей Groq: {models}")
-        return models
+        logger.info(f"Найдено доступных моделей Groq: {allowed_models}")
+        return allowed_models
 
     except Exception as e:
         logger.error(f"Ошибка получения списка моделей: {e}")
         # Возвращаем дефолтный список моделей
         return [
-            "meta-llama/llama-4-scout-17b-16e-instruct"
+            "NONE_MODEL"
+            # "meta-llama/llama-4-scout-17b-16e-instruct"
         ]
 
 
@@ -69,7 +82,7 @@ def get_next_model(current_model: str, available_models: List[str]) -> Optional[
         if current_index < len(available_models) - 1:
             return available_models[current_index + 1]
         else:
-            return None  # Достигли конца списка
+            return available_models[0]  # Достигли конца списка
     except ValueError:
         # Если текущей модели нет в списке, начинаем с первой
         return available_models[0] if available_models else None
@@ -80,8 +93,8 @@ class LLMClient:
 
     def __init__(self):
         self.api_key = config.api.groq_api_key
-        self.current_model = "meta-llama/llama-4-scout-17b-16e-instruct"
         self.available_models = get_available_groq_models(self.api_key)
+        self.current_model = self.available_models[0] if self.available_models else "meta-llama/llama-4-scout-17b-16e-instruct"
         self.client = Groq(api_key=self.api_key)
         # Счётчик ошибок для текущей модели
         self.model_errors = {}
@@ -110,6 +123,7 @@ class LLMClient:
         else:
             logger.error(f"Все доступные модели исчерпали лимиты. "
                          f"Последняя модель: {self.current_model}")
+            self.model_errors = {}
             return False
 
     async def _call_groq_with_retry(self, messages: List[Dict],
@@ -136,9 +150,11 @@ class LLMClient:
                     model=self.current_model,
                     temperature=0.01,
                     max_tokens=4000,
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
+                    timeout=3
                 )
-
+                
+                
                 # Если успешно, сбрасываем счётчик ошибок для этой модели
                 if self.current_model in self.model_errors:
                     del self.model_errors[self.current_model]
@@ -151,25 +167,39 @@ class LLMClient:
                 error_str = str(e)
                 logger.warning(f"Ошибка при вызове модели {self.current_model}: {error_str}")
 
+
+
                 # Проверяем, это rate limit или другая ошибка
-                if "429" in error_str or "rate_limit" in error_str.lower():
-                    # Пробуем переключить модель
+                if "403" in error_str or "404" in error_str:
+
+                    logger.warning(f"Модель {self.current_model} отключена для аккаунта. Немедленная ротация.")
                     success = await self._rotate_model()
                     if not success:
-                        logger.error("Не удалось переключить модель, все лимиты исчерпаны")
                         return None
-                    retry_count = -1 # Если переключились на следующую модель, то сбрасываем счётчик ошибок
+                    retry_count = -1
+
+                elif "429" in error_str or "rate_limit" in error_str.lower():
+                    
+                    if retry_count < 5:
+                        await asyncio.sleep(2)  # Экспоненциальная задержка
+                    else:
+                        # Пробуем переключить модель
+                        success = await self._rotate_model()
+                        if not success:
+                            logger.error("Не удалось переключить модель, все лимиты исчерпаны")
+                            return None
+                        retry_count = -1 # Если переключились на следующую модель, то сбрасываем счётчик ошибок
                 else:
                     # Для других ошибок пробуем переподключиться к той же модели
                     logger.error(f"Ошибка модели {self.current_model}: {e}")
-                    if retry_count < max_retries - 1:
+                    if retry_count < 5:
                         await asyncio.sleep(2)  # Экспоненциальная задержка
                     else:
                         # Если это последняя попытка, пробуем сменить модель
                         success = await self._rotate_model()
                         if not success:
                             return None
-                        retry_count = -1 # Если переключились на следующую модель, то сбрасываем счётчик ошибок
+                        # retry_count = -1 # Если переключились на следующую модель, то сбрасываем счётчик ошибок
                 retry_count += 1
 
         # Если все попытки провалились, возвращаемся к исходной модели

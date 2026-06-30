@@ -123,8 +123,9 @@ function loadWeeklyDigest() {
         if (data.success && data.config) {
             const w = data.config.digest_schedule.weekly;
             if (w) {
+
                 const days = ['mon','tue','wed','thu','fri','sat','sun'];
-                $('#weekly_day').val(days.indexOf(w.day_of_week) || 6);
+                $('#weekly_day').val(days.indexOf(w.day_of_week));
                 $('#weekly_hour').val(String(w.hour).padStart(2,'0') + ':' + String(w.minute).padStart(2,'0'));
                 $('#weekly_enabled').prop('checked', w.enabled !== false);
             }

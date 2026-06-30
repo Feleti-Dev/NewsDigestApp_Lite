@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from telethon.errors import SessionPasswordNeededError
 from app.configs import config
+from telethon.tl.types import PeerChannel
 from .base_parser import BaseParser
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class TelegramParser(BaseParser):
 
         if not api_id or not api_hash:
             logger.warning(
-                "Telegram API ID/Hash не указаны. Telegram парсер будет работать в тестовом режиме."
+                "[Telegram] Telegram API ID/Hash не указаны. Telegram парсер будет работать в тестовом режиме."
             )
             return
 
@@ -57,13 +58,13 @@ class TelegramParser(BaseParser):
                 lang_code="ru",
             )
 
-            logger.info(f"Telethon клиент инициализирован. Сессия: {self.session_file}")
+            logger.info(f"[Telegram] Telethon клиент инициализирован. Сессия: {self.session_file}")
 
         except ImportError:
-            logger.error("Telethon не установлен. Установите: pip install telethon")
+            logger.error("[Telegram] Telethon не установлен. Установите: pip install telethon")
             self.client = None
         except Exception as e:
-            logger.error(f"Ошибка инициализации Telethon: {e}")
+            logger.error(f"[Telegram] Ошибка инициализации Telethon: {e}")
             self.client = None
 
     def _get_2fa_password(self) -> Optional[str]:
@@ -84,7 +85,7 @@ class TelegramParser(BaseParser):
         # Пробуем из переменной окружения
         env_password = os.getenv('TELEGRAM_2FA_PASSWORD', "")
         if env_password and env_password != "":
-            logger.info("Пароль 2FA загружен из переменной окружения TELEGRAM_2FA_PASSWORD")
+            logger.info("[Telegram] Пароль 2FA загружен из переменной окружения TELEGRAM_2FA_PASSWORD")
             return env_password
 
 
@@ -92,7 +93,7 @@ class TelegramParser(BaseParser):
 
     def _code_callback(self) -> str:
         """Колбэк для получения кода из консоли (интерактивный режим)"""
-        logger.info(f"Введите код из Telegram: ")
+        logger.info(f"[Telegram] Введите код из Telegram: ")
         return input()
 
     def _password_callback(self) -> str:
@@ -100,14 +101,14 @@ class TelegramParser(BaseParser):
         password = self._get_2fa_password()
         if password:
             return password
-        logger.info(f"Введите пароль 2FA: ")
+        logger.info(f"[Telegram] Введите пароль 2FA: ")
         return getpass.getpass()
 
     def _phone_callback(self) -> str:
         """Колбэк для получения номера телефона"""
         if self._phone and self._phone != "":
             return self._phone
-        logger.info(f"Введите номер телефона (375291234567): ")
+        logger.info(f"[Telegram] Введите номер телефона (375291234567): ")
         return input()
 
     async def _authenticate(self) -> bool:
@@ -123,10 +124,10 @@ class TelegramParser(BaseParser):
         try:
             # Проверяем, не авторизованы ли мы уже
             if await self.client.is_user_authorized():
-                logger.debug("Используем сохраненную сессию")
+                logger.debug("[Telegram] Используем сохраненную сессию")
                 return True
 
-            logger.info("Требуется авторизация в Telegram...")
+            logger.info("[Telegram] Требуется авторизация в Telegram...")
 
             # Если есть номер телефона, используем его
             phone = self._phone or None
@@ -138,7 +139,7 @@ class TelegramParser(BaseParser):
                 # Полный автоматический режим: телефон и 2FA пароль известны
                 try:
                     await self.client.send_code_request(phone)
-                    logger.info(f"Код отправлен на номер {phone}")
+                    logger.info(f"[Telegram] Код отправлен на номер {phone}")
 
                     # В автоматическом режиме без кода - используем QR или ждем ручного ввода
                     # Для полной автоматизации нужно получить код из другого источника
@@ -146,17 +147,17 @@ class TelegramParser(BaseParser):
                     code = self._code_callback()
 
                     await self.client.sign_in(phone, code, password=two_fa_password)
-                    logger.info("Авторизация успешна (с 2FA)")
+                    logger.info("[Telegram] Авторизация успешна (с 2FA)")
                     return True
 
                 except SessionPasswordNeededError:
                     # Пароль требуется, но не был передан
                     if two_fa_password:
                         await self.client.sign_in(phone, password=two_fa_password)
-                        logger.info("Авторизация успешна (2FA)")
+                        logger.info("[Telegram] Авторизация успешна (2FA)")
                         return True
                     else:
-                        logger.error("Требуется пароль 2FA, но он не настроен")
+                        logger.error("[Telegram] Требуется пароль 2FA, но он не настроен")
                         return False
 
             elif phone and phone != "":
@@ -165,14 +166,14 @@ class TelegramParser(BaseParser):
                     await self.client.send_code_request(phone)
                     code = self._code_callback()
                     await self.client.sign_in(phone, code)
-                    logger.info("Авторизация успешна (без 2FA)")
+                    logger.info("[Telegram] Авторизация успешна (без 2FA)")
                     return True
                 except SessionPasswordNeededError:
                     # 2FA включен, запрашиваем пароль
                     password = self._password_callback()
                     if password:
                         await self.client.sign_in(phone, password=password)
-                        logger.info("Авторизация успешна (2FA введён)")
+                        logger.info("[Telegram] Авторизация успешна (2FA введён)")
                         # Сохраняем пароль для будущих сессий
                         self._two_fa_password = password
                         return True
@@ -184,11 +185,11 @@ class TelegramParser(BaseParser):
                     password=self._password_callback(),
                     code_callback=self._code_callback(),
                 )
-                logger.info("Авторизация успешна (интерактивный режим)")
+                logger.info("[Telegram] Авторизация успешна (интерактивный режим)")
                 return True
 
         except Exception as e:
-            logger.error(f"Ошибка авторизации: {e}")
+            logger.error(f"[Telegram] Ошибка авторизации: {e}")
             return False
 
         return False
@@ -199,6 +200,7 @@ class TelegramParser(BaseParser):
         """
         Получение сообщений с Telegram канала
         """
+
         # Если нет клиента Telethon, возвращаем тестовые данные
         if not self.client:
             return []
@@ -207,33 +209,28 @@ class TelegramParser(BaseParser):
             # Используем контекстный менеджер для автоматического управления соединением
             if not self.client.is_connected():
                 await self.client.connect()
-                logger.info("Telethon клиент подключен")
+                logger.info("[Telegram] Telethon клиент подключен")
 
             # Авторизация с поддержкой 2FA
             auth_success = await self._authenticate()
             if not auth_success:
-                logger.error("Не удалось авторизоваться в Telegram")
+                logger.error("[Telegram] Не удалось авторизоваться в Telegram")
                 return []
+
+
+
 
             # Получаем сущность канала
             try:
+                dialogs = await self.client.get_dialogs()
                 entity = None
-                # Пробуем разные форматы
-                if channel_id.startswith("@"):
-                    entity = await self.client.get_entity(channel_id)
-                    logger.debug(f"Найден канал по @username: {channel_id}")
-                elif channel_id.startswith("https://t.me/"):
-                    # Извлекаем username из URL
-                    username = channel_id.replace("https://t.me/", "").split("/")[0]
-                    entity = await self.client.get_entity(f"@{username}")
-                    logger.debug(f"Найден канал по URL: {channel_id}")
+                if "-100" == channel_id[:4]:
+                    entity = await self.client.get_entity(PeerChannel(int(channel_id)))
                 else:
-                    # Пробуем как username
-                    entity = await self.client.get_entity(f"@{channel_id}")
-                    logger.debug(f"Найден канал по ID: {channel_id}")
-
+                    entity = await self.client.get_entity(channel_id)
+                logger.debug(f"[Telegram] Найден канал по ID: {channel_id}")
             except Exception as e:
-                logger.error(f"Не удалось найти канал {channel_id}: {e}")
+                logger.error(f"[Telegram] Не удалось найти канал {channel_id}: {e}")
                 return []
 
             # Получаем сообщения (сырые объекты Telethon)
@@ -262,13 +259,13 @@ class TelegramParser(BaseParser):
                         break
 
             except Exception as e:
-                logger.error(f"Ошибка при получении сообщений: {e}")
+                logger.error(f"[Telegram] Ошибка при получении сообщений: {e}")
                 return []
 
             return messages  # Возвращаем СЫРЫЕ данные
 
         except Exception as e:
-            logger.error(f"Ошибка при получении сообщений из {channel_id}: {e}")
+            logger.error(f"[Telegram] Ошибка при получении сообщений из {channel_id}: {e}")
             return []
 
     def extract_news_data(self, raw_data: Any) -> Dict[str, Any]:
@@ -345,10 +342,10 @@ class TelegramParser(BaseParser):
             return news_data
 
         except Exception as e:
-            logger.error(f"Ошибка извлечения данных из сообщения Telegram: {e}")
+            logger.error(f"[Telegram] Ошибка извлечения данных из сообщения Telegram: {e}")
             import traceback
 
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"[Telegram] Traceback: {traceback.format_exc()}")
             return {}
 
     async def close(self):
@@ -356,5 +353,5 @@ class TelegramParser(BaseParser):
             try:
                 await self.client.disconnect()
             except Exception as e:
-                logger.error("Ошибка при закрытии парсера Telegram ", e)
+                logger.error("[Telegram] Ошибка при закрытии парсера Telegram ", e)
         self.client = None
