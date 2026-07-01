@@ -112,7 +112,7 @@ class SchedulerManager:
 
         logger.info("✅ SchedulerManager полностью инициализирован")
 
-    async def start_cron(self):
+    def start_cron(self):
         """Запуск планировщика"""
         logger.info("🚀 Запуск планировщика проходов...")
 

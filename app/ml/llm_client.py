@@ -4,206 +4,219 @@
 """
 import json
 import logging
+import time
 from datetime import datetime
-from typing import Dict, Any
-from groq import Groq
-import requests
-from typing import List, Optional
+from typing import Dict, Any, List, Optional, Set
+from groq import AsyncGroq
+from groq._exceptions import (
+    RateLimitError,
+    APITimeoutError,
+    PermissionDeniedError,
+    NotFoundError,
+    BadRequestError,
+    AuthenticationError,
+    InternalServerError,
+)
+import httpx
 from app.configs.config import config
 from app.configs.llm_prompts import AD_DETECTION_PROMPT, INTEREST_SCORING_PROMPT, DIGEST_PROCESSING_PROMPT
-import asyncio
 
 logger = logging.getLogger(__name__)
 
+BLOCKED_MODELS = frozenset({
+    "canopylabs/orpheus-arabic-saudi",
+    "canopylabs/orpheus-v1-english",
+    "groq/compound-mini",
+    "llama-3.1-8b-instant",
+    "meta-llama/llama-prompt-guard-2-22m",
+    "meta-llama/llama-prompt-guard-2-86m",
+    "openai/gpt-oss-safeguard-20b",
+    "whisper-large-v3",
+    "whisper-large-v3-turbo"})
 
-blocked_models = [
-"canopylabs/orpheus-arabic-saudi",
-"canopylabs/orpheus-v1-english",
-"groq/compound-mini",
-"llama-3.1-8b-instant",
-"meta-llama/llama-prompt-guard-2-22m",
-"meta-llama/llama-prompt-guard-2-86m",
-"openai/gpt-oss-safeguard-20b",
-"whisper-large-v3",
-"whisper-large-v3-turbo"]
-
-def get_available_groq_models(api_key: str) -> List[str]:
-    """
-    Получение списка доступных моделей Groq
-
-    Args:
-        api_key: Groq API ключ
-
-    Returns:
-        Список ID доступных моделей
-    """
-    try:
-        url = "https://api.groq.com/openai/v1/models"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-
-        data = response.json()
-        models = [model["id"] for model in data.get("data", [])]
-        allowed_models = list(set(models) - set(blocked_models))
-
-        logger.info(f"Найдено доступных моделей Groq: {allowed_models}")
-        return allowed_models
-
-    except Exception as e:
-        logger.error(f"Ошибка получения списка моделей: {e}")
-        # Возвращаем дефолтный список моделей
-        return [
-            "NONE_MODEL"
-            # "meta-llama/llama-4-scout-17b-16e-instruct"
-        ]
+JSON_MODE_BLOCKED = frozenset({
+    # "llama-3.3-70b-versatile",
+    # "gemma2-9b-it",
+})
 
 
-def get_next_model(current_model: str, available_models: List[str]) -> Optional[str]:
-    """
-    Получение следующей модели для ротации
-
-    Args:
-        current_model: Текущая модель
-        available_models: Список доступных моделей
-
-    Returns:
-        Следующая модель или None если это последняя
-    """
-    if not available_models:
-        return None
-
-    try:
-        current_index = available_models.index(current_model)
-        if current_index < len(available_models) - 1:
-            return available_models[current_index + 1]
-        else:
-            return available_models[0]  # Достигли конца списка
-    except ValueError:
-        # Если текущей модели нет в списке, начинаем с первой
-        return available_models[0] if available_models else None
-
+#
+# def get_available_groq_models(api_key: str) -> List[str]:
+#     """
+#     Получение списка доступных моделей Groq
+#
+#     Args:
+#         api_key: Groq API ключ
+#
+#     Returns:
+#         Список ID доступных моделей
+#     """
+#     try:
+#         url = "https://api.groq.com/openai/v1/models"
+#         headers = {
+#             "Authorization": f"Bearer {api_key}",
+#             "Content-Type": "application/json"
+#         }
+#
+#         response = requests.get(url, headers=headers, timeout=10)
+#         response.raise_for_status()
+#
+#         data = response.json()
+#         models = [model["id"] for model in data.get("data", [])]
+#         allowed_models = list(set(models) - set(blocked_models))
+#
+#         logger.info(f"Найдено доступных моделей Groq: {allowed_models}")
+#         return allowed_models
+#
+#     except Exception as e:
+#         logger.error(f"Ошибка получения списка моделей: {e}")
+#         # Возвращаем дефолтный список моделей
+#         return [
+#             "NONE_MODEL"
+#             # "meta-llama/llama-4-scout-17b-16e-instruct"
+#         ]
+#
+#
+# def get_next_model(current_model: str, available_models: List[str]) -> Optional[str]:
+#     """
+#     Получение следующей модели для ротации
+#
+#     Args:
+#         current_model: Текущая модель
+#         available_models: Список доступных моделей
+#
+#     Returns:
+#         Следующая модель или None если это последняя
+#     """
+#     if not available_models:
+#         return None
+#
+#     try:
+#         current_index = available_models.index(current_model)
+#         if current_index < len(available_models) - 1:
+#             return available_models[current_index + 1]
+#         else:
+#             return available_models[0]  # Достигли конца списка
+#     except ValueError:
+#         # Если текущей модели нет в списке, начинаем с первой
+#         return available_models[0] if available_models else None
+#
 
 class LLMClient:
     """Клиент для работы с Groq API"""
 
     def __init__(self):
         self.api_key = config.api.groq_api_key
-        self.available_models = get_available_groq_models(self.api_key)
-        self.current_model = self.available_models[0] if self.available_models else "meta-llama/llama-4-scout-17b-16e-instruct"
-        self.client = Groq(api_key=self.api_key)
-        # Счётчик ошибок для текущей модели
-        self.model_errors = {}
+        self._client: Optional[AsyncGroq] = None
+        self.available_models: List[str] = []
+        self.current_model: str = ""
+        self._banned_models: Set[str] = set()
+        self._models_last_fetch: float = 0
+        self._models_cache_ttl: int = 3600  # 1 час
+
+    async def _ensure_client(self) -> AsyncGroq:
+        if self._client is None:
+            self._client = AsyncGroq(
+                api_key=self.api_key,
+                max_retries=5,
+                timeout=httpx.Timeout(60.0, connect=10.0),
+                default_headers={"User-Agent": "NewsDigestApp/1.0"},
+            )
+        return self._client
+
+    async def _fetch_available_models(self) -> List[str]:
+        now = time.time()
+        if self.available_models and (now - self._models_last_fetch) < self._models_cache_ttl:
+            return self.available_models
+
+        try:
+            client = await self._ensure_client()
+            data = await client.models.list()
+            models = [m.id for m in data.data if m.id not in BLOCKED_MODELS]
+            models.sort()
+            # Фильтруем модели, не поддерживающие JSON mode
+            json_supported = [m for m in models if m not in JSON_MODE_BLOCKED]
+            if json_supported:
+                models = json_supported
+            self.available_models = models
+            self._models_last_fetch = now
+            if not self.current_model and models:
+                self.current_model = models[0]
+            logger.info(f"Найдено доступных моделей Groq: {models}")
+        except Exception as e:
+            logger.error(f"Ошибка получения списка моделей: {e}")
+            if not self.available_models:
+                self.available_models = []
+        return self.available_models
 
     async def _rotate_model(self) -> bool:
-        """
-        Переключение на следующую модель при ошибках
+        self._banned_models.add(self.current_model)
+        candidates = [m for m in self.available_models if m not in self._banned_models]
+        if not candidates:
+            logger.error(f"Все модели забанены. Сбрасываем banned.")
+            self._banned_models.clear()
+            candidates = self.available_models
+            if not candidates:
+                return False
+        self.current_model = candidates[0]
+        logger.warning(f"Ротация на модель: {self.current_model}")
+        return True
 
-        Args:
-            error_type: Тип ошибки ("rate_limit" или "general")
+    async def _call_groq(self, messages: List[Dict], response_format: Optional[Dict: str, str] = None) -> Optional[str]:
+        client = await self._ensure_client()
+        kwargs = dict(
+            messages=messages,
+            model=self.current_model,
+            max_tokens=4000,
+            seed=42,
+        )
+        if response_format:
+            kwargs["response_format"] = response_format
 
-        Returns:
-            True если удалось переключить модель, False если модели закончились
-        """
-        # Увеличиваем счётчик ошибок для текущей модели
-        self.model_errors[self.current_model] = self.model_errors.get(self.current_model, 0) + 1
+        start = time.monotonic()
+        chat_completion = await client.chat.completions.create(**kwargs)
+        elapsed = time.monotonic() - start
+        logger.info(
+            f"Groq {self.current_model}: {elapsed:.2f}s, {chat_completion.usage.total_tokens if hasattr(chat_completion, 'usage') else '?'} tokens")
 
-        # Если это rate limit, ищем следующую модель
-        next_model = get_next_model(self.current_model, self.available_models)
+        content = chat_completion.choices[0].message.content
+        if content:
+            content = content.replace("```", "").replace("json", "").replace("\n\n", "\n")
+        return content
 
-        if next_model:
-            logger.warning(f"Rate limit достигнут для модели {self.current_model}. "
-                           f"Переключаюсь на {next_model}")
-            self.current_model = next_model
-            return True
-        else:
-            logger.error(f"Все доступные модели исчерпали лимиты. "
-                         f"Последняя модель: {self.current_model}")
-            self.model_errors = {}
-            return False
-
-    async def _call_groq_with_retry(self, messages: List[Dict],
-                                    max_retries: int = 10) -> Optional[str]:
-        """
-        Вызов Groq API с ротацией моделей при лимитах
-
-        Args:
-            messages: Сообщения для LLM
-            max_retries: Максимальное количество попыток (с разными моделями)
-
-        Returns:
-            Ответ от LLM или None если все попытки провалились
-        """
-        retry_count = 0
-        original_model = self.current_model
-
-        while retry_count < max_retries:
+    async def _call_with_rotation(self, messages: List[Dict], response_format: Optional[Dict: str, str] = None) -> \
+            Optional[str]:
+        max_rotations = len(self.available_models) or 1
+        for attempt in range(max_rotations):
             try:
-                # logger.info(f"Использую модель: {self.current_model}")
-
-                chat_completion = self.client.chat.completions.create(
-                    messages=messages,
-                    model=self.current_model,
-                    temperature=0.01,
-                    max_tokens=4000,
-                    response_format={"type": "json_object"},
-                    timeout=3
-                )
-                
-                
-                # Если успешно, сбрасываем счётчик ошибок для этой модели
-                if self.current_model in self.model_errors:
-                    del self.model_errors[self.current_model]
-                return (chat_completion.choices[0].message.content
-                        .replace("```", "")
-                        .replace("json", "")
-                        .replace("\n\n","\n"))
-
+                return await self._call_groq(messages, response_format)
+            except (PermissionDeniedError, NotFoundError) as e:
+                logger.warning(f"Модель {self.current_model} недоступна ({e}). Ротация.")
+                if not await self._rotate_model():
+                    return None
+            except RateLimitError as e:
+                logger.warning(f"Rate limit на {self.current_model}: {e}")
+                if not await self._rotate_model():
+                    return None
+            except APITimeoutError:
+                logger.warning(f"Таймаут на {self.current_model}")
+                # if attempt == max_rotations - 1:
+                if not await self._rotate_model():
+                    return None
+            except BadRequestError as e:
+                logger.error(f"BadRequest (не ретраим): {e}")
+                return None
+            except AuthenticationError as e:
+                logger.error(f"AuthenticationError (не ретраим): {e}")
+                return None
+            except InternalServerError as e:
+                logger.warning(f"5xx на {self.current_model}: {e}. Ротация.")
+                if not await self._rotate_model():
+                    return None
             except Exception as e:
-                error_str = str(e)
-                logger.warning(f"Ошибка при вызове модели {self.current_model}: {error_str}")
-
-
-
-                # Проверяем, это rate limit или другая ошибка
-                if "403" in error_str or "404" in error_str:
-
-                    logger.warning(f"Модель {self.current_model} отключена для аккаунта. Немедленная ротация.")
-                    success = await self._rotate_model()
-                    if not success:
-                        return None
-                    retry_count = -1
-
-                elif "429" in error_str or "rate_limit" in error_str.lower():
-                    
-                    if retry_count < 5:
-                        await asyncio.sleep(2)  # Экспоненциальная задержка
-                    else:
-                        # Пробуем переключить модель
-                        success = await self._rotate_model()
-                        if not success:
-                            logger.error("Не удалось переключить модель, все лимиты исчерпаны")
-                            return None
-                        retry_count = -1 # Если переключились на следующую модель, то сбрасываем счётчик ошибок
-                else:
-                    # Для других ошибок пробуем переподключиться к той же модели
-                    logger.error(f"Ошибка модели {self.current_model}: {e}")
-                    if retry_count < 5:
-                        await asyncio.sleep(2)  # Экспоненциальная задержка
-                    else:
-                        # Если это последняя попытка, пробуем сменить модель
-                        success = await self._rotate_model()
-                        if not success:
-                            return None
-                        # retry_count = -1 # Если переключились на следующую модель, то сбрасываем счётчик ошибок
-                retry_count += 1
-
-        # Если все попытки провалились, возвращаемся к исходной модели
-        self.current_model = original_model
+                logger.error(f"Неизвестная ошибка на {self.current_model}: {e}")
+                if attempt == max_rotations - 1:
+                    return None
         return None
 
     async def detect_advertisement(self, news_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -221,23 +234,27 @@ class LLMClient:
             return []
         try:
             # Подготавливаем данные для промта
-            news_for_prompt = []
-            for i, news in enumerate(news_items):
-                news_for_prompt.append({
+            news_for_prompt = [
+                {
                     "index": i,
                     "title": news.get('title', ''),
                     "text": news.get('text', ''),
                     "url": news.get('url', '')
-                })
+                }
+                for i, news in enumerate(news_items)
+            ]
 
             prompt = AD_DETECTION_PROMPT.format(
                 news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2)
             )
 
-            response_text = await self._call_groq_with_retry([
-                {"role": "system", "content": "Ты - эксперт по определению рекламного контента."},
-                {"role": "user", "content": prompt}
-            ])
+            response_text = await self._call_with_rotation(
+                [
+                    {"role": "system", "content": "Ты - эксперт по определению рекламного контента."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+            )
 
             if not response_text:
                 logger.error("Не удалось получить ответ от LLM для детекции рекламы")
@@ -247,14 +264,17 @@ class LLMClient:
             try:
                 results = json.loads(response_text)
                 # Приводим к списку если вернулся одиночный объект
-                if "results" in results:
-                    results = results["results"]
                 if isinstance(results, dict):
+                    if "results" in results:
+                        results = results["results"]
+                    else:
+                        results = [results]
+                if not isinstance(results, list):
                     results = [results]
-                elif not isinstance(results, list):
-                    results = [results]
+
                 # logger.info(f"LLM ADVERT RESULT: {results}")
                 return results
+
             except json.JSONDecodeError as e:
                 logger.error(f"Ошибка парсинга JSON в детекции рекламы: {e}")
                 return [{"is_advertisement": True, "confidence": -1.0} for _ in news_items]
@@ -277,25 +297,28 @@ class LLMClient:
         """
         try:
             # Подготавливаем данные для промта
-            news_for_prompt = []
-            for news in news_data:
-                news_for_prompt.append({
+            news_for_prompt = [
+                {
                     "source": news.get("Source", ""),
                     "headline": news.get("Headline", ""),
                     "text": news.get("News_text", ""),
                     "url": news.get("News_URL", ""),
                     "publication_date": str(news.get("Publication_date", "")),
                     "has_image": news.get("Has_image", False)
-                })
+                }
+                for news in news_data
+            ]
 
             prompt = INTEREST_SCORING_PROMPT.format(
                 topic=topic,
                 news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2)
             )
-            response_text = await self._call_groq_with_retry([
+            response_text = await self._call_with_rotation([
                 {"role": "system", "content": f"Ты - эксперт по оценке новостей в теме: {topic}"},
                 {"role": "user", "content": prompt}
-            ])
+            ],
+                response_format={"type": "json_object"})
+
             if not response_text:
                 logger.error("Не удалось получить ответ от LLM после всех попыток")
                 # Возвращаем дефолтные оценки
@@ -303,12 +326,16 @@ class LLMClient:
                     news["Interest_score"] = float(0.00)
                     news["reason"] = "Ошибка получения оценки"
                 return news_data
+
             results = json.loads(response_text)
             if isinstance(results, dict):
+                if "results" in results:
+                    results = results["results"]
+                else:
+                    results = [results]
+            if not isinstance(results, list):
                 results = [results]
-            elif not isinstance(results, list):
-                results = [results]
-            # logger.info(f"LLM SCORE RESULT: {results}")
+
             for news, result in zip(news_data, results):
                 news["Interest_score"] = float(result["interest_score"])
                 news["reason"] = result["reason"]
@@ -335,9 +362,8 @@ class LLMClient:
         try:
             current_date = datetime.now().strftime("%d.%m.%Y")
             # Подготавливаем данные для промта
-            news_for_prompt = []
-            for news in news_items:
-                news_for_prompt.append({
+            news_for_prompt = [
+                {
                     "id": news.get("id", ""),
                     "source": news.get("source", ""),
                     "title": news.get("title", ""),
@@ -345,17 +371,23 @@ class LLMClient:
                     "url": news.get("url", ""),
                     "image_url": news.get("image_url", ""),
                     "interest_score": news.get("interest_score", 0.0)
-                })
+                }
+                for news in news_items
+            ]
             digest_type_format = {"daily": "Дневной", "weekly": "Недельный", "monthly": "Месячный"}
             prompt = DIGEST_PROCESSING_PROMPT.format(
                 date=current_date,
                 digest_type=digest_type_format.get(digest_type, 'Дневной'),
                 news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2)
             )
-            response_text = await self._call_groq_with_retry([
+            response_text = await self._call_with_rotation([
                 {"role": "system", "content": "Ты - профессиональный редактор дайджестов новостей."},
                 {"role": "user", "content": prompt}
-            ])
+            ],
+                response_format={"type": "json_object"})
+
+            if not response_text:
+                return {"digest_text": ""}
 
             result = json.loads(response_text)
             return {
@@ -368,4 +400,15 @@ class LLMClient:
 
 
 # Глобальный экземпляр для использования во всем приложении
-llm_client = LLMClient()
+# llm_client = LLMClient()
+
+# Lazy initialization — не блокирует event loop при импорте
+llm_client: Optional[LLMClient] = None
+
+
+async def get_llm_client() -> LLMClient:
+    global llm_client
+    if llm_client is None:
+        llm_client = LLMClient()
+        await llm_client._fetch_available_models()
+    return llm_client

@@ -8,7 +8,7 @@ from datetime import datetime
 from app.database.db_utils import DatabaseManager
 from .formatter import HTMLDigestFormatter  # Изменено на HTML форматтер
 from app.configs.config import config
-from app.ml.llm_client import llm_client
+from app.ml.llm_client import get_llm_client
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class DigestCreator:
             Словарь с данными дайджеста или None
         """
         logger.info(f"🛠️  Создание {digest_type} дайджеста...")
-
+        llm_client = await get_llm_client()
         try:
             # 1. Получение топ новостей из БД
             news_items = await self._get_top_news(digest_type, is_test)

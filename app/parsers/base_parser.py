@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from app.configs.config import config
 from app.database.db_utils import DatabaseManager
-from app.ml.llm_client import llm_client
+from app.ml.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -77,38 +77,6 @@ class BaseParser(ABC):
             #re.compile(r'\b(телефон|phone|тел\.?)\s*[+\d\s\-()]+', re.IGNORECASE),  # Телефоны
             #re.compile(r'\b(email|почта|e-mail)\s*[:=]?\s*[\w\.-]+@[\w\.-]+', re.IGNORECASE),  # Email
         ]
-
-    # Обновляем функцию is_advertisement:
-    async def is_advertisement(self, news_data: Dict[str, Any]) -> bool:
-        """
-        Определение, является ли пост рекламным
-
-        Args:
-            news_data: Данные новости
-
-        Returns:
-            True если это реклама
-        """
-        try:
-        # Используем LLM API если настроено
-            title = news_data.get('title', '')
-            text = news_data.get('text', '')
-
-            if not title and not text:
-                return False
-
-            result = await llm_client.detect_advertisement(title,text)
-
-            # Используем порог уверенности
-            if result["is_advertisement"] and result["confidence"] > 0.75:
-                logger.info(f"⚠️  LLM определила рекламу (confidence: {result['confidence']:.2f}): {title[:50]}..., {news_data.get('url','')}")
-                return True
-            return False
-
-        except Exception as e:
-            logger.error(f"Ошибка при проверке на рекламу: {e}")
-            return True
-
     def _init_db_manager(self):
         """Инициализация менеджера БД (отложенная)"""
         if not self.db_manager:
@@ -274,7 +242,9 @@ class BaseParser(ABC):
                 for news in normalized_news
             ]
 
+
             # Пакетный вызов LLM
+            llm_client = await get_llm_client()
             ads_results = await llm_client.detect_advertisement(news_for_ads_check)
 
             # Фильтруем рекламу
@@ -364,6 +334,7 @@ class BaseParser(ABC):
             Оценка от 0.0000 до 1.0000
         """
         try:
+            llm_client = await get_llm_client()
             # Используем LLM API если настроено
             result = await llm_client.calculate_interest_score(news_data, config.app.topic)
 
