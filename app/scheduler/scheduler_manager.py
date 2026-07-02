@@ -122,7 +122,7 @@ class SchedulerManager:
         if config.scheduler.daily_single_pass["enabled"]:
             # 1. ЕЖЕДНЕВНЫЙ проход
             self.scheduler.add_job(
-                self.start_single_pass(),
+                self.start_single_pass,
                 trigger=CronTrigger(hour=config.scheduler.daily_single_pass["hour"],
                                     minute=config.scheduler.daily_single_pass["minute"]),
                 id='daily_single_pass',
