@@ -2,9 +2,7 @@
 """
 Клиент для работы с LLM API (Groq)
 """
-import json
-import logging
-import time
+import json, logging, time, asyncio, re
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Set
 from groq import AsyncGroq
@@ -16,6 +14,8 @@ from groq._exceptions import (
     BadRequestError,
     AuthenticationError,
     InternalServerError,
+    APIStatusError
+
 )
 import httpx
 from app.configs.config import config
@@ -113,6 +113,7 @@ class LLMClient:
         self._banned_models: Set[str] = set()
         self._models_last_fetch: float = 0
         self._models_cache_ttl: int = 3600  # 1 час
+        self._semaphore = asyncio.Semaphore(2)
 
     async def _ensure_client(self) -> AsyncGroq:
         if self._client is None:
@@ -162,7 +163,7 @@ class LLMClient:
         logger.warning(f"Ротация на модель: {self.current_model}")
         return True
 
-    async def _call_groq(self, messages: List[Dict], response_format: Optional[Dict: str, str] = None) -> Optional[str]:
+    async def _call_groq(self, messages: List[Dict], response_format: Optional[Dict[str,str]] = None) -> Optional[str]:
         client = await self._ensure_client()
         kwargs = dict(
             messages=messages,
@@ -184,12 +185,13 @@ class LLMClient:
             content = content.replace("```", "").replace("json", "").replace("\n\n", "\n")
         return content
 
-    async def _call_with_rotation(self, messages: List[Dict], response_format: Optional[Dict: str, str] = None) -> \
+    async def _call_with_rotation(self, messages: List[Dict], response_format: Optional[Dict[str,str]] = None) -> \
             Optional[str]:
         max_rotations = len(self.available_models) or 1
         for attempt in range(max_rotations):
             try:
-                return await self._call_groq(messages, response_format)
+                async with self._semaphore:
+                    return await self._call_groq(messages, response_format)
             except (PermissionDeniedError, NotFoundError) as e:
                 logger.warning(f"Модель {self.current_model} недоступна ({e}). Ротация.")
                 if not await self._rotate_model():
@@ -204,13 +206,18 @@ class LLMClient:
                 if not await self._rotate_model():
                     return None
             except BadRequestError as e:
-                logger.error(f"BadRequest (не ретраим): {e}")
-                return None
+                logger.error(f"BadRequest: {e}")
+                if not await self._rotate_model():
+                    return None
             except AuthenticationError as e:
                 logger.error(f"AuthenticationError (не ретраим): {e}")
                 return None
             except InternalServerError as e:
                 logger.warning(f"5xx на {self.current_model}: {e}. Ротация.")
+                if not await self._rotate_model():
+                    return None
+            except APIStatusError as e:
+                logger.warning(f"{e.status_code} на {self.current_model}: {e}. Ротация.")
                 if not await self._rotate_model():
                     return None
             except Exception as e:
