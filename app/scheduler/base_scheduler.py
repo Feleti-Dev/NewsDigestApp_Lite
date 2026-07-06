@@ -76,10 +76,10 @@ class BaseScheduler:
 
     async def initialize(self):
         """Инициализация планировщика"""
-        logger.info(f"🚀 Инициализация {self.scheduler_type.upper()} Scheduler...")
+        logger.info(f"[Scheduler]🚀 Инициализация {self.scheduler_type.upper()} Scheduler...")
 
         # Загружаем каналы из БД (синхронизация с Google Sheets при необходимости)
-        logger.info("🔄 Загрузка каналов из БД...")
+        logger.info("[Scheduler]🔄 Загрузка каналов из БД...")
         self._channels_by_source = self.sync_manager.sync_channels(force=True)
 
         # Инициализируем индексы каналов
@@ -88,16 +88,16 @@ class BaseScheduler:
 
         # Логируем количество каналов по источникам
         for source_type, channels in self._channels_by_source.items():
-            logger.info(f"  {source_type}: {len(channels)} каналов")
+            logger.info(f"[Scheduler]  {source_type}: {len(channels)} каналов")
 
         # Проверяем состояние парсеров
-        logger.info("🔍 Проверка состояния парсеров...")
+        logger.info("[Scheduler]🔍 Проверка состояния парсеров...")
         parser_status = self.parser_manager.get_parsers_status()["api_status"]
         if parser_status:
             for source_type, status in parser_status.items():
-                logger.info(f"  {source_type}: {status}")
+                logger.info(f"[Scheduler]  {source_type}: {status}")
 
-        logger.info("✅ Инициализация завершена")
+        logger.info("[Scheduler]✅ Инициализация завершена")
 
     def _get_next_channel(self, source_type: str) -> Optional[ChannelSource]:
         """
@@ -120,7 +120,7 @@ class BaseScheduler:
         # Фильтруем только активные каналы
         active_channels = [ch for ch in channels if ch.is_active]
         if not active_channels:
-            logger.warning(f"Нет активных каналов для {source_type}")
+            logger.warning(f"[Scheduler]Нет активных каналов для {source_type}")
             return None
 
         current_index = self._channel_indices.get(source_type, 0)
@@ -132,7 +132,7 @@ class BaseScheduler:
                 self._channel_indices[source_type] = 0
             else:
             # Последовательный режим: возвращаем None когда каналы закончились
-                logger.debug(f"Все каналы для {source_type} обработаны")
+                logger.debug(f"[Scheduler]Все каналы для {source_type} обработаны")
                 return None
 
         next_channel = active_channels[current_index]
@@ -166,13 +166,13 @@ class BaseScheduler:
             for source_type, is_active in config.app.parser_status.items()
             if is_active and source_type in self._channels_by_source
         ]
-        # logger.info(f"Active_sources: {active_sources}, indexes: {self._channel_indices}")
+        # logger.info(f"[Scheduler]Active_sources: {active_sources}, indexes: {self._channel_indices}")
 
         for source_type in active_sources:
             channels = self._channels_by_source.get(source_type, [])
             active_channels = [ch for ch in channels if ch.is_active]
             current_index = self._channel_indices.get(source_type, 0)
-            # logger.info(f"source_type: {source_type} current_index: {current_index}. active_channels: {len(active_channels)}")
+            # logger.info(f"[Scheduler]source_type: {source_type} current_index: {current_index}. active_channels: {len(active_channels)}")
             if current_index < len(active_channels):
                 return False  # Есть необработанные каналы
         return True  # Все каналы обработаны
@@ -190,7 +190,7 @@ class BaseScheduler:
             Количество собранных новостей
         """
         try:
-            logger.info(f"🔍 Обработка канала {source_type}: {channel.channel_id}")
+            logger.info(f"[Scheduler]🔍 Обработка канала {source_type}: {channel.channel_id}")
 
             # Обновляем время последней обработки
             channel.last_processed = datetime.now()
@@ -198,7 +198,7 @@ class BaseScheduler:
             # Получаем парсер для этого типа источника
             parser: BaseParser = self.parser_manager.parsers.get(source_type)
             if not parser:
-                logger.error(f"Парсер для {source_type} не найден")
+                logger.error(f"[Scheduler]Парсер для {source_type} не найден")
                 self.db_manager.update_channel_result(
                     channel.channel_id, source_type, success=False
                 )
@@ -206,7 +206,7 @@ class BaseScheduler:
 
             # Обрабатываем канал
             news_items = await parser.process_channel(channel.url, channel.channel_id)
-            logger.info(f"📊 Предварительный результат: {len(news_items)} новостей")
+            logger.info(f"[Scheduler]📊 Предварительный результат: {len(news_items)} новостей")
 
             if not news_items:
                 # Успешно, но новостей нет
@@ -216,15 +216,15 @@ class BaseScheduler:
                     success=True,
                     news_count=0
                 )
-                logger.info(f"📭 {channel.channel_id}: новостей не найдено")
+                logger.info(f"[Scheduler]📭 {channel.channel_id}: новостей не найдено")
                 return 0
 
             # Фильтрация по порогу полезности
-            logger.info(f"🔍 Фильтрация новостей по порогу полезности {config.app.interest_threshold}...")
+            logger.info(f"[Scheduler]🔍 Фильтрация новостей по порогу полезности {config.app.interest_threshold}...")
             filtered_news = await parser.filter_by_interest_threshold(news_items)
 
             # Сохранение в базу данных
-            logger.debug(f"Сохранение {len(filtered_news)} новостей в БД")
+            logger.debug(f"[Scheduler]Сохранение {len(filtered_news)} новостей в БД")
             saved_count = parser.save_to_database(filtered_news)
 
             # Расчет средней оценки
@@ -246,11 +246,11 @@ class BaseScheduler:
                 avg_score=avg_score
             )
 
-            logger.info(f"✅ Канал {channel.channel_id}: собрано {saved_count} новостей, средний балл {avg_score:.4f}")
+            logger.info(f"[Scheduler]✅ Канал {channel.channel_id}: собрано {saved_count} новостей, средний балл {avg_score:.4f}")
             return saved_count
 
         except Exception as e:
-            logger.error(f"❌ Ошибка обработки канала {channel.channel_id}: {e}")
+            logger.error(f"[Scheduler]❌ Ошибка обработки канала {channel.channel_id}: {e}")
             self.db_manager.update_channel_result(
                 channel.channel_id, source_type, success=False
             )
@@ -352,7 +352,7 @@ class BaseScheduler:
 
     async def stop(self):
         """Остановка планировщика"""
-        logger.info(f"🛑 Остановка {self.scheduler_type.upper()} Scheduler...")
+        logger.info(f"[Scheduler]🛑 Остановка {self.scheduler_type.upper()} Scheduler...")
         self.is_running = False
 
         # Закрываем парсеры
@@ -361,10 +361,10 @@ class BaseScheduler:
         # 1. Сначала отменяем все задачи
         for task_name, task in self.tasks.items():
             if not task.done():
-                logger.info(f"🛑 Отмена задачи {task_name}...")
+                logger.info(f"[Scheduler]🛑 Отмена задачи {task_name}...")
                 task.cancel()
         self.tasks = {}
-        logger.info(f"✅ {self.scheduler_type.upper()} Scheduler остановлен")
+        logger.info(f"[Scheduler]✅ {self.scheduler_type.upper()} Scheduler остановлен")
 
 
     def _start_source_task(self, source_type: str):
@@ -378,7 +378,7 @@ class BaseScheduler:
 
         task = asyncio.create_task(self._process_source_task(source_type), name=f"{source_type}")
         self.tasks[source_type] = task
-        logger.info(f"✅ Задача для {source_type},{self.is_running} запущена: {task}")
+        logger.info(f"[Scheduler]✅ Задача для {source_type},{self.is_running} запущена: {task}")
 
     async def _process_source_task(self, source_type: str):
         """
@@ -391,17 +391,17 @@ class BaseScheduler:
         Args:
             source_type: тип источника
         """
-        logger.info(f"📋 Запуск обработки источника {source_type}")
+        logger.info(f"[Scheduler]📋 Запуск обработки источника {source_type}")
 
         if not self.is_running:
-            logger.warning(f"Планировщик не запущен, задача {source_type} пропущена")
+            logger.warning(f"[Scheduler]Планировщик не запущен, задача {source_type} пропущена")
             return
 
         while True:
             try:
                 # Проверяем завершение (для однократного режима)
                 if not self.cycle and self._check_finished():
-                    logger.info(f"Все каналы {source_type} обработаны")
+                    logger.info(f"[Scheduler]Все каналы {source_type} обработаны")
                     break
 
                 # Проверяем, не требуется ли перезапуск парсера
@@ -417,7 +417,7 @@ class BaseScheduler:
 
                 if not channel:
                     # Каналы закончились (для однократного режима)
-                    logger.info(f"Все каналы {source_type} обработаны")
+                    logger.info(f"[Scheduler]Все каналы {source_type} обработаны")
                     break
 
                 # Обрабатываем канал
@@ -431,16 +431,16 @@ class BaseScheduler:
                 await asyncio.sleep(interval)
 
             except asyncio.CancelledError:
-                logger.info(f"Задача {source_type} отменена")
+                logger.info(f"[Scheduler]Задача {source_type} отменена")
                 break
             except Exception as e:
-                logger.error(f"Ошибка при обработке {source_type}: {e}")
+                logger.error(f"[Scheduler]Ошибка при обработке {source_type}: {e}")
                 await asyncio.sleep(60)
                 break
 
     async def _sync_loop(self):
         """Цикл синхронизации с Google Sheets"""
-        logger.info("🔄 Запуск цикла синхронизации")
+        logger.info("[Scheduler]🔄 Запуск цикла синхронизации")
 
         while self.is_running:
             try:
@@ -448,7 +448,7 @@ class BaseScheduler:
                 await asyncio.sleep(24 * 3600)  # 24 часа
 
                 if self.is_running:
-                    logger.info("🔄 Плановое обновление каналов из Google Sheets...")
+                    logger.info("[Scheduler]🔄 Плановое обновление каналов из Google Sheets...")
                     channels_by_source = self.sync_manager.sync_channels()
                     self._channels_by_source = channels_by_source
 
@@ -456,18 +456,18 @@ class BaseScheduler:
                     for source_type in channels_by_source:
                         self._channel_indices[source_type] = 0
 
-                    logger.info("✅ Синхронизация завершена")
+                    logger.info("[Scheduler]✅ Синхронизация завершена")
 
             except asyncio.CancelledError:
-                logger.info("Цикл синхронизации отменен")
+                logger.info("[Scheduler]Цикл синхронизации отменен")
                 break
             except Exception as e:
-                logger.error(f"Ошибка синхронизации: {e}")
+                logger.error(f"[Scheduler]Ошибка синхронизации: {e}")
                 await asyncio.sleep(3600)  # Ждем час при ошибке
 
     async def _monitoring_loop(self):
         """Цикл мониторинга и статистики"""
-        logger.info("📊 Запуск цикла мониторинга")
+        logger.info("[Scheduler]📊 Запуск цикла мониторинга")
 
         while self.is_running:
             try:
@@ -493,14 +493,14 @@ class BaseScheduler:
                             )
 
             except asyncio.CancelledError:
-                logger.info("Цикл мониторинга отменен")
+                logger.info("[Scheduler]Цикл мониторинга отменен")
                 break
             except Exception as e:
-                logger.error(f"Ошибка мониторинга: {e}")
+                logger.error(f"[Scheduler]Ошибка мониторинга: {e}")
 
     async def restart_source(self, source_type: str):
         """Перезапуск парсера источника"""
-        logger.info(f"🔄 Перезапуск парсера {source_type}...")
+        logger.info(f"[Scheduler]🔄 Перезапуск парсера {source_type}...")
 
         # Сбрасываем индекс каналов
         self._channel_indices[source_type] = 0
@@ -518,11 +518,11 @@ class BaseScheduler:
         # Создаем новую задачу
         self._start_source_task(source_type)
 
-        logger.info(f"✅ Парсер {source_type} перезапущен")
+        logger.info(f"[Scheduler]✅ Парсер {source_type} перезапущен")
 
     async def force_sync(self):
         """Принудительная синхронизация с Google Sheets"""
-        logger.info("🔄 Принудительная синхронизация...")
+        logger.info("[Scheduler]🔄 Принудительная синхронизация...")
         channels_by_source = self.sync_manager.sync_channels(force=True)
         self._channels_by_source = channels_by_source
 
@@ -530,14 +530,14 @@ class BaseScheduler:
         for source_type in channels_by_source:
             self._channel_indices[source_type] = 0
 
-        logger.info("✅ Принудительная синхронизация завершена")
+        logger.info("[Scheduler]✅ Принудительная синхронизация завершена")
 
     async def _on_all_sources_finished(self):
         """
         Hook called when all sources are finished (for single-pass mode).
         Override in subclasses to add custom behavior (e.g., digest publishing).
         """
-        logger.info("📋 Все источники обработаны")
+        logger.info("[Scheduler]📋 Все источники обработаны")
         pass
 
     async def _execute_digest_with_retry(self, digest_type: str, is_test: bool = False):
@@ -566,10 +566,10 @@ class BaseScheduler:
         self.loop = asyncio.get_running_loop()
 
         if self.is_running:
-            logger.warning("Планировщик уже запущен")
+            logger.warning("[Scheduler]Планировщик уже запущен")
             return
 
-        logger.info(f"🚀 Запуск {self.scheduler_type.upper()} Scheduler...")
+        logger.info(f"[Scheduler]🚀 Запуск {self.scheduler_type.upper()} Scheduler...")
         self.is_running = True
         self.start_time = datetime.now()
 
@@ -591,7 +591,7 @@ class BaseScheduler:
             for source_type in source_types:
                 self._start_source_task(source_type)
 
-            logger.info(f"✅ {self.scheduler_type.upper()} Scheduler: запущено {len(source_types)} источников")
+            logger.info(f"[Scheduler]✅ {self.scheduler_type.upper()} Scheduler: запущено {len(source_types)} источников")
 
             # Для циклического режима запускаем доп. задачи
             if self.cycle:
@@ -607,17 +607,17 @@ class BaseScheduler:
             while self.is_running:
                 # Проверяем завершение для однократного режима
                 if not self.cycle and self._check_finished():
-                    logger.info("завершение для однократного режима")
+                    logger.info("[Scheduler]завершение для однократного режима")
                     await self._on_all_sources_finished()
                     break
 
                 await asyncio.sleep(1)
 
-            logger.info(f"✅ {self.scheduler_type.upper()} Scheduler завершил работу")
+            logger.info(f"[Scheduler]✅ {self.scheduler_type.upper()} Scheduler завершил работу")
 
         except KeyboardInterrupt:
-            logger.info("Получен сигнал прерывания")
+            logger.info("[Scheduler]Получен сигнал прерывания")
         except Exception as e:
-            logger.error(f"❌ Критическая ошибка в планировщике: {e}")
+            logger.error(f"[Scheduler]❌ Критическая ошибка в планировщике: {e}")
         finally:
             await self.stop()

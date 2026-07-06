@@ -3,7 +3,7 @@ APScheduler==3.10.4
 Flask==3.1.2
 Flask_Cors==4.0.0
 google_api_python_client==2.187.0
-groq==1.0.0
+groq
 hypercorn==0.18.0
 langdetect==1.0.9
 Pillow==12.1.0
@@ -12,6 +12,7 @@ protobuf==6.33.4
 pystray==0.19.5
 python-dotenv==1.2.1
 pytz==2024.1
+openai
 quart==0.20.0
 quart_cors==0.8.0
 Requests==2.32.5
