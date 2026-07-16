@@ -12,3 +12,5 @@ if %ERRORLEVEL% NEQ 0 (
     echo Can't start app. Error in app. You can close the window
     pause
 )
+
+pause

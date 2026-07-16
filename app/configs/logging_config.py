@@ -1,4 +1,5 @@
 import logging
+import logging.config
 import os
 import sys
 from datetime import datetime
@@ -6,6 +7,17 @@ from logging.handlers import RotatingFileHandler
 
 from .config import config
 
+
+
+# Импорты для скрытия логов
+# import openai
+# import httpx
+# import instructor
+
+logging.config.dictConfig({
+    'version': 1,
+    'disable_existing_loggers': True,
+})
 
 def setup_logging():
     """Настройка логирования для приложения"""
@@ -17,8 +29,10 @@ def setup_logging():
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
+
+
     # Базовый логгер
-    logger = logging.getLogger()
+    logger = logging.getLogger("Server")
 
     # Устанавливаем уровень логирования
     log_level = getattr(logging, config.app.log_level.upper(), logging.INFO)
@@ -26,6 +40,13 @@ def setup_logging():
 
     # Удаляем существующие обработчики
     logger.handlers.clear()
+
+    logging.getLogger("httpx").setLevel(logging.CRITICAL)
+    logging.getLogger("httpcore").setLevel(logging.CRITICAL)
+    logging.getLogger("openai").setLevel(logging.CRITICAL)
+    logging.getLogger("openai._base_client").setLevel(logging.CRITICAL)
+    logging.getLogger("httpx._client").setLevel(logging.CRITICAL)
+    logging.getLogger("instructor").setLevel(logging.CRITICAL)
 
     # Консольный обработчик
     console_handler = logging.StreamHandler(sys.stdout)
@@ -56,6 +77,8 @@ def setup_logging():
     file_handler.setFormatter(logging.Formatter(log_format, date_format))
     file_handler.setLevel(log_level)
     logger.addHandler(file_handler)
+
+
 
     # Логирование запуска
     logger.info("=" * 60)

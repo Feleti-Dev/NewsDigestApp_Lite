@@ -5,6 +5,7 @@ Flask_Cors==4.0.0
 google_api_python_client==2.187.0
 groq
 hypercorn==0.18.0
+instructor
 langdetect==1.0.9
 Pillow==12.1.0
 praw==7.7.1

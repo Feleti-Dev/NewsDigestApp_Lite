@@ -66,7 +66,8 @@ class NewsDigestApp:
         line_upper = line_clean.upper()
 
         # Определяем уровень важности по ключевым словам
-        if any(x in line_upper for x in ['ERROR', 'EXCEPTION', 'CRITICAL', 'TRACEBACK']):
+        # 'EXCEPTION', 'CRITICAL', 'TRACEBACK'
+        if any(x in line_upper for x in ['ERROR']):
             log_func = logger.error
         elif any(x in line_upper for x in ['WARN', 'WARNING']):
             log_func = logger.warning
