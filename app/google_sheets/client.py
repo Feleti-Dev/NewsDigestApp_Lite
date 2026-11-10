@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -40,9 +40,7 @@ class GoogleSheetsClient:
             logger.error(f"❌ Ошибка аутентификации в Google Sheets: {e}")
             self.service = None
 
-    def get_sheet_data(
-        self, sheet_name: str, range_name: str = "A:A"
-    ) -> List[List[Any]]:
+    def get_sheet_data(self, sheet_name: str, range_name: str = "A:A") -> list[list[Any]]:
         """
         Получение данных из указанного листа и диапазона
 
@@ -64,7 +62,10 @@ class GoogleSheetsClient:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=config.google_sheets.google_spreadsheet_id, range=full_range)
+                .get(
+                    spreadsheetId=config.google_sheets.google_spreadsheet_id,
+                    range=full_range,
+                )
                 .execute()
             )
 
@@ -84,7 +85,7 @@ class GoogleSheetsClient:
             logger.error(f"Неожиданная ошибка: {e}")
             return []
 
-    def get_available_sheets(self) -> Dict[str, str]:
+    def get_available_sheets(self) -> dict[str, str]:
         """Получение списка доступных листов в таблице"""
         if not self.service or not config.google_sheets.google_spreadsheet_id:
             return {}

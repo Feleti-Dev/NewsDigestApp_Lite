@@ -2,81 +2,115 @@
 """
 Клиент для работы с LLM API (Groq)
 """
-import json, logging, time, asyncio, re
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Set
-# from groq import AsyncGroq
-# from groq._exceptions import (
-#     RateLimitError,
-#     APITimeoutError,
-#     PermissionDeniedError,
-#     NotFoundError,
-#     BadRequestError,
-#     AuthenticationError,
-#     InternalServerError,
-#     APIStatusError
-#
-# )
 
+import asyncio
+import json
+import logging
+import time
+from datetime import datetime
+from typing import Any
+
+import httpx
+import instructor
+from instructor.v2.core.errors import InstructorRetryException
 from openai import AsyncOpenAI
 from openai._exceptions import (
-    RateLimitError,
+    APIStatusError,
     APITimeoutError,
-    PermissionDeniedError,
-    NotFoundError,
-    BadRequestError,
     AuthenticationError,
+    BadRequestError,
     InternalServerError,
-    APIStatusError
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
 )
-import httpx
+from pydantic import BaseModel, Field
+
 from app.configs.config import config
-from app.configs.llm_prompts import AD_DETECTION_PROMPT, INTEREST_SCORING_PROMPT, DIGEST_PROCESSING_PROMPT
+from app.configs.llm_prompts import (
+    AD_DETECTION_PROMPT,
+    DIGEST_PROCESSING_PROMPT,
+    INTEREST_SCORING_PROMPT,
+)
 
 logger = logging.getLogger(__name__)
 
-BLOCKED_MODELS = frozenset({
-    "canopylabs/orpheus-arabic-saudi",
-    "canopylabs/orpheus-v1-english",
-    "groq/compound-mini",
-    "llama-3.1-8b-instant",
-    "meta-llama/llama-prompt-guard-2-22m",
-    "meta-llama/llama-prompt-guard-2-86m",
-    "openai/gpt-oss-safeguard-20b",
-    "whisper-large-v3",
-    "whisper-large-v3-turbo"})
+BLOCKED_MODELS = frozenset(
+    {
+        "canopylabs/orpheus-arabic-saudi",
+        "canopylabs/orpheus-v1-english",
+        "groq/compound-mini",
+        "llama-3.1-8b-instant",
+        "meta-llama/llama-prompt-guard-2-22m",
+        "meta-llama/llama-prompt-guard-2-86m",
+        "openai/gpt-oss-safeguard-20b",
+        "whisper-large-v3",
+        "whisper-large-v3-turbo",
+    }
+)
 
-JSON_MODE_BLOCKED = frozenset({
-    # "llama-3.3-70b-versatile",
-    # "gemma2-9b-it",
-})
+JSON_MODE_BLOCKED = frozenset(
+    {
+        # "llama-3.3-70b-versatile",
+        # "gemma2-9b-it",
+    }
+)
+
+
+class Digest(BaseModel):
+    digest: str = Field(description="Готовый к публикации дайджест")
+
+
+class Advert(BaseModel):
+    id: int = Field(description="Порядковый номер новости в наборе")
+    is_advertisement: bool = Field(description="Является ли новость рекламой")
+    confidence: float = Field(description="Показатель уверенности", ge=0.0, le=1.0)
+
+
+class Score(BaseModel):
+    id: int = Field(description="Порядковый номер новости в наборе")
+    interest_score: float = Field(description="Показатель интереса новости", ge=0.0, le=1.0)
+    reason: str = Field(description="Краткое объяснение выставленного показателя")
+
+
+class AdvertOutput(BaseModel):
+    verdicts: list[Advert] = Field(description="Набор вердиктов определения рекламы")
+
+
+class ScoreOutput(BaseModel):
+    verdicts: list[Score] = Field(description="Набор вердиктов интересов новостей")
+
 
 class LLMClient:
     """Клиент для работы с Groq API"""
 
     def __init__(self):
-        self.base_url = "https://api.groq.com/openai/v1" #"https://api.groq.com/openai/v1" #"https://ai.feleti.by/llm/v1"
+        self.base_url = config.api.llm_api_base_url
         self.api_key = config.api.groq_api_key or ""
-        self._client: Optional[AsyncOpenAI] = None
-        self.available_models: List[str] = []
+        self._client: AsyncOpenAI | instructor.AsyncInstructor | None = None
+        self.available_models: list[str] = []
         self.current_model: str = ""
-        self._banned_models: Set[str] = set()
+        self._banned_models: set[str] = set()
         self._models_last_fetch: float = 0
         self._models_cache_ttl: int = 3600  # 1 час
         self._semaphore = asyncio.Semaphore(1)
 
-    async def _ensure_client(self) -> AsyncOpenAI:
+    async def _ensure_client(self) -> AsyncOpenAI | instructor.AsyncInstructor:
         if self._client is None:
-            self._client = AsyncOpenAI(
-                base_url=self.base_url,
-                api_key=self.api_key,
-                max_retries=6,
-                timeout=httpx.Timeout(60.0, connect=10.0),
-                default_headers={"User-Agent": "NewsDigestApp/1.0"},
+            self._client: instructor.AsyncInstructor = instructor.from_openai(
+                AsyncOpenAI(
+                    base_url=self.base_url,
+                    api_key=self.api_key,
+                    max_retries=6,
+                    timeout=httpx.Timeout(60.0, connect=10.0),
+                    default_headers={"User-Agent": "NewsDigestApp/1.0"},
+                ),
+                mode=instructor.Mode.JSON,
             )
+
         return self._client
 
-    async def _fetch_available_models(self) -> List[str]:
+    async def _fetch_available_models(self) -> list[str]:
         now = time.time()
         if self.available_models and (now - self._models_last_fetch) < self._models_cache_ttl:
             return self.available_models
@@ -105,7 +139,7 @@ class LLMClient:
         self._banned_models.add(self.current_model)
         candidates = [m for m in self.available_models if m not in self._banned_models]
         if not candidates:
-            logger.error(f"[LLM] Все модели забанены. Сбрасываем banned.")
+            logger.error("[LLM] Все модели забанены. Сбрасываем banned.")
             self._banned_models.clear()
             candidates = self.available_models
             if not candidates:
@@ -114,30 +148,35 @@ class LLMClient:
         logger.warning(f"[LLM] Ротация на модель: {self.current_model}")
         return True
 
-    async def _call_groq(self, messages: List[Dict], response_format: Optional[Dict[str,str]] = None) -> Optional[str]:
+    async def _call_groq(
+        self, messages: list[dict], response_format: type[BaseModel] | None = None
+    ) -> type[BaseModel] | list | None:
         client = await self._ensure_client()
-        kwargs = dict(
-            messages=messages,
-            model=self.current_model,
-            max_tokens=4096,
-            seed=42,
-        )
-        if response_format:
-            kwargs["response_format"] = response_format
+        kwargs = {
+            "messages": messages,
+            "model": self.current_model,
+            "max_tokens": 4096,
+            "seed": 42,
+            "response_model": response_format,
+        }
+        # if response_format:
+        # kwargs["response_format"] = response_format
 
         start = time.monotonic()
-        chat_completion = await client.chat.completions.create(**kwargs)
+
+        chat_completion = await client.create(**kwargs)
         elapsed = time.monotonic() - start
         logger.info(
-            f"[LLM] Groq {self.current_model}: {elapsed:.2f}s, {chat_completion.choices[0].message} ,{chat_completion.usage.total_tokens if hasattr(chat_completion, 'usage') else '?'} tokens")
-
-        content = chat_completion.choices[0].message.content
+            f"[LLM] Groq {self.current_model}: {elapsed:.2f}s, {chat_completion}"  # {chat_completion.choices[0].message} ,{chat_completion.usage.total_tokens if hasattr(chat_completion, 'usage') else '?'} tokens")
+        )
+        content = chat_completion
         if content:
             content = content.replace("```", "").replace("json", "").replace("\n\n", "\n")
         return content
 
-    async def _call_with_rotation(self, messages: List[Dict], response_format: Optional[Dict[str,str]] = None) -> \
-            Optional[str]:
+    async def _call_with_rotation(
+        self, messages: list[dict], response_format: type[BaseModel] | None = None
+    ) -> type[BaseModel] | list | None:
         max_rotations = len(self.available_models) or 1
         for attempt in range(max_rotations):
             try:
@@ -171,13 +210,24 @@ class LLMClient:
                 logger.warning(f"[LLM] {e.status_code} на {self.current_model}: {e}. Ротация.")
                 if not await self._rotate_model():
                     return None
+            except InstructorRetryException as e:
+                print(f"Failed after {e.n_attempts} attempts")
+                print(f"Total tokens used: {e.total_usage}")
+                print(f"Model used: {e.create_kwargs.get('model')}")
+
+                # Inspect failed attempts
+                for attempt in e.failed_attempts:
+                    print(f"Attempt {attempt.attempt_number}: {attempt.exception}")
+
             except Exception as e:
                 logger.error(f"[LLM] Неизвестная ошибка на {self.current_model}: {e}")
                 if attempt == max_rotations - 1:
                     return None
+                if not await self._rotate_model():
+                    return None
         return None
 
-    async def detect_advertisement(self, news_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def detect_advertisement(self, news_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Определение рекламы в тексте
 
@@ -195,9 +245,9 @@ class LLMClient:
             news_for_prompt = [
                 {
                     "id": i,
-                    "title": news.get('title', ''),
-                    "text": news.get('text', ''),
-                    "url": news.get('url', '')
+                    "title": news.get("title", ""),
+                    "text": news.get("text", ""),
+                    "url": news.get("url", ""),
                 }
                 for i, news in enumerate(news_items)
             ]
@@ -206,41 +256,43 @@ class LLMClient:
                 news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2)
             )
 
-            response_text = await self._call_with_rotation(
+            response_text: list[Advert] = await self._call_with_rotation(
                 [
-                    {"role": "system", "content": "Ты - эксперт по определению рекламного контента."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "Ты - эксперт по определению рекламного контента.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
-                response_format={"type": "json_object"},
+                response_format=list[Advert],
             )
-
-
 
             if not response_text:
                 logger.error("[LLM] Не удалось получить ответ от LLM для детекции рекламы")
                 # Возвращаем дефолтные значения (не реклама)
                 return [{"is_advertisement": True, "confidence": -1.0} for _ in news_items]
 
-            try:
-                results = json.loads(response_text)
-                logger.info(f"[LLM] Реклама: {results}")
-                # Приводим к списку если вернулся одиночный объект
-                if results:
-                    results = results.get("verdicts",[])
+            # try:
+            # results = json.loads(response_text)
+            logger.info(f"[LLM] Реклама: {response_text}")
+            # Приводим к списку если вернулся одиночный объект
+            # if results:
+            #     results = results.get("verdicts", [])
 
-                # logger.info(f"[LLM] LLM ADVERT RESULT: {results}")
-                return results
+            # logger.info(f"[LLM] LLM ADVERT RESULT: {results}")
+            return response_text
 
-            except json.JSONDecodeError as e:
-                logger.error(f"[LLM] Ошибка парсинга JSON в детекции рекламы: {e}")
-                return [{"is_advertisement": True, "confidence": -1.0} for _ in news_items]
+            # except json.JSONDecodeError as e:
+            #     logger.error(f"[LLM] Ошибка парсинга JSON в детекции рекламы: {e}")
+            #     return [{"is_advertisement": True, "confidence": -1.0} for _ in news_items]
 
         except Exception as e:
             logger.error(f"[LLM] Ошибка при детекции рекламы: {e}")
             return [{"is_advertisement": True, "confidence": -1.0} for _ in news_items]
 
-    async def calculate_interest_score(self, news_data: List[Dict[str, Any]], topic: str = "Искусственный интеллект") -> \
-            List[Dict[str, Any]]:
+    async def calculate_interest_score(
+        self, news_data: list[dict[str, Any]], topic: str = "Искусственный интеллект"
+    ) -> list[dict[str, Any]]:
         """
         Расчет оценки полезности новости
 
@@ -260,32 +312,36 @@ class LLMClient:
                     "text": news.get("News_text", ""),
                     "url": news.get("News_URL", ""),
                     "publication_date": str(news.get("Publication_date", "")),
-                    "has_image": news.get("Has_image", False)
+                    "has_image": news.get("Has_image", False),
                 }
                 for news in news_data
             ]
 
             prompt = INTEREST_SCORING_PROMPT.format(
                 topic=topic,
-                news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2)
+                news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2),
             )
-            response_text = await self._call_with_rotation([
-                {"role": "system", "content": f"Ты - эксперт по оценке новостей в теме: {topic}"},
-                {"role": "user", "content": prompt}
-            ],
-                response_format={"type": "json_object"})
+            response_text: list[Score] = await self._call_with_rotation(
+                [
+                    {
+                        "role": "system",
+                        "content": f"Ты - эксперт по оценке новостей в теме: {topic}",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=list[Score],
+            )
 
             if not response_text:
                 logger.error("[LLM] Не удалось получить ответ от LLM после всех попыток")
                 # Возвращаем дефолтные оценки
                 for news in news_data:
-                    news["Interest_score"] = float(0.00)
+                    news["Interest_score"] = 0.00
                     news["reason"] = "Ошибка получения оценки"
                 return news_data
 
             logger.info(f"[LLM] Расчёт оценки полезности: {response_text}")
-            results = json.loads(response_text)
-
+            # results = json.loads(response_text)
 
             # if isinstance(results, dict):
             #     if "results" in results:
@@ -294,10 +350,10 @@ class LLMClient:
             #         results = [results]
             # if not isinstance(results, list):
             #     results = [results]
-            if results:
-                results = results.get("verdicts", [])
+            # if results:
+            #     results = results.get("verdicts", [])
 
-            for news, result in zip(news_data, results):
+            for news, result in zip(news_data, response_text):
                 news["Interest_score"] = float(result["interest_score"])
                 news["reason"] = result["reason"]
             return news_data
@@ -305,12 +361,14 @@ class LLMClient:
         except Exception as e:
             logger.error(f"[LLM] Ошибка при расчете оценки полезности: {e.args, e.__traceback__}")
             for news in news_data:
-                news["Interest_score"] = float(0.00)
+                news["Interest_score"] = 0.00
                 news["reason"] = "Ошибка в расчёте"
             return news_data
 
-    async def process_digest_news(self, news_items: List[Dict[str, Any]], digest_type: str = 'daily') -> Dict[str, Any]:
-        """
+    async def process_digest_news(
+        self, news_items: list[dict[str, Any]], digest_type: str = "daily"
+    ) -> dict[str, Any]:
+        r"""
         Обработка новостей для дайджеста (перевод, суммаризация, форматирование)
 
         Args:
@@ -331,32 +389,37 @@ class LLMClient:
                     "text": news.get("text", ""),
                     "url": news.get("url", ""),
                     "image_url": news.get("image_url", ""),
-                    "interest_score": news.get("interest_score", 0.0)
+                    "interest_score": news.get("interest_score", 0.0),
                 }
                 for news in news_items
             ]
-            digest_type_format = {"daily": "Дневной", "weekly": "Недельный", "monthly": "Месячный"}
+            digest_type_format = {
+                "daily": "Дневной",
+                "weekly": "Недельный",
+                "monthly": "Месячный",
+            }
             prompt = DIGEST_PROCESSING_PROMPT.format(
                 date=current_date,
-                digest_type=digest_type_format.get(digest_type, 'Дневной'),
-                news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2)
+                digest_type=digest_type_format.get(digest_type, "Дневной"),
+                news_data=json.dumps(news_for_prompt, ensure_ascii=False, indent=2),
             )
-            response_text = await self._call_with_rotation([
-                {"role": "system", "content": "Ты - профессиональный редактор дайджестов новостей."},
-                {"role": "user", "content": prompt}
-            ],
-                response_format={"type": "json_object"})
-
-
+            response_text = await self._call_with_rotation(
+                [
+                    {
+                        "role": "system",
+                        "content": "Ты - профессиональный редактор дайджестов новостей.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+            )
 
             if not response_text:
                 return {"digest_text": ""}
 
             result = json.loads(response_text)
             logger.info(f"[LLM] Дайджест: {result}")
-            return {
-                "digest_text": result.get("digest_text", "")
-            }
+            return {"digest_text": result.get("digest_text", "")}
 
         except Exception as e:
             logger.error(f"[LLM] Ошибка при обработке дайджеста: {e}")
@@ -367,7 +430,13 @@ class LLMClient:
 # llm_client = LLMClient()
 
 # Lazy initialization — не блокирует event loop при импорте
-llm_client: Optional[LLMClient] = None
+llm_client: LLMClient | None = None
+
+
+def reset_llm_client() -> None:
+    """Сброс singleton после смены API URL/ключа в настройках."""
+    global llm_client
+    llm_client = None
 
 
 async def get_llm_client() -> LLMClient:
@@ -376,3 +445,13 @@ async def get_llm_client() -> LLMClient:
         llm_client = LLMClient()
         await llm_client._fetch_available_models()
     return llm_client
+
+
+if __name__ == "__main__":
+    print(json.dumps(AdvertOutput.model_json_schema(), indent=3))
+    print(AdvertOutput.schema())
+    print(AdvertOutput.schema_json())
+    # print(AdvertOutput.json())
+    print(AdvertOutput.model_config)
+    print(AdvertOutput.model_dump())
+    print(AdvertOutput.model_dump_json())

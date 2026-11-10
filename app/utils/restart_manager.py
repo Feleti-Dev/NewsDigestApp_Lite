@@ -2,12 +2,13 @@
 Менеджер для перезапуска приложения.
 Реализует паттерн Singleton для глобального доступа.
 """
+
 import asyncio
 import gc
 import logging
 import threading
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class RestartManager:
         """
         Остановка текущего приложения перед перезапуском.
         """
-        if self.app_instance and hasattr(self.app_instance, 'is_running'):
+        if self.app_instance and hasattr(self.app_instance, "is_running"):
             if self.app_instance.is_running:
                 logger.info("🛑 Остановка текущего приложения...")
                 await self.app_instance.stop()
@@ -127,10 +128,11 @@ class RestartManager:
         except Exception as e:
             logger.error(f"❌ Ошибка при создании нового приложения: {e}")
             import traceback
+
             logger.error(f"Трассировка:\n{traceback.format_exc()}")
             return False
 
-    async def restart_full(self) -> Dict[str, Any]:
+    async def restart_full(self) -> dict[str, Any]:
         """
         Полный перезапуск приложения.
         Перезапускает приложение путём создания нового экземпляра.
@@ -152,26 +154,26 @@ class RestartManager:
 
             if success:
                 return {
-                    'success': True,
-                    'message': 'Приложение успешно перезапущено',
-                    'timestamp': datetime.now().isoformat()
+                    "success": True,
+                    "message": "Приложение успешно перезапущено",
+                    "timestamp": datetime.now().isoformat(),
                 }
             else:
                 return {
-                    'success': False,
-                    'message': 'Ошибка при перезапуске приложения',
-                    'timestamp': datetime.now().isoformat()
+                    "success": False,
+                    "message": "Ошибка при перезапуске приложения",
+                    "timestamp": datetime.now().isoformat(),
                 }
 
         except Exception as e:
             logger.error(f"❌ Критическая ошибка при перезапуске: {e}")
             return {
-                'success': False,
-                'message': f'Критическая ошибка: {str(e)}',
-                'timestamp': datetime.now().isoformat()
+                "success": False,
+                "message": f"Критическая ошибка: {e!s}",
+                "timestamp": datetime.now().isoformat(),
             }
 
-    def restart_from_api(self) -> Dict[str, Any]:
+    def restart_from_api(self) -> dict[str, Any]:
         """
         Инициация перезапуска из API.
         Запускает перезапуск в отдельном потоке и сразу возвращает ответ.
@@ -192,12 +194,12 @@ class RestartManager:
         thread.start()
 
         return {
-            'success': True,
-            'message': 'Система перезапускается...',
-            'timestamp': datetime.now().isoformat()
+            "success": True,
+            "message": "Система перезапускается...",
+            "timestamp": datetime.now().isoformat(),
         }
 
-    def shutdown_from_api(self) -> Dict[str, Any]:
+    def shutdown_from_api(self) -> dict[str, Any]:
         """
         Инициация завершения работы из API.
         Устанавливает флаг завершения и возвращает ответ.
@@ -211,12 +213,12 @@ class RestartManager:
         self._shutdown_requested = True
 
         return {
-            'success': True,
-            'message': 'Система завершает работу...',
-            'timestamp': datetime.now().isoformat()
+            "success": True,
+            "message": "Система завершает работу...",
+            "timestamp": datetime.now().isoformat(),
         }
 
-    async def restart_soft(self) -> Dict[str, Any]:
+    async def restart_soft(self) -> dict[str, Any]:
         """
         Мягкий перезапуск.
         Перезагружает только конфигурацию без остановки компонентов.
@@ -246,17 +248,17 @@ class RestartManager:
             logger.info("✅ Конфигурация перезагружена")
 
             return {
-                'success': True,
-                'message': 'Конфигурация перезагружена',
-                'timestamp': datetime.now().isoformat()
+                "success": True,
+                "message": "Конфигурация перезагружена",
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
             logger.error(f"❌ Ошибка мягкого перезапуска: {e}")
             return {
-                'success': False,
-                'message': f'Ошибка: {str(e)}',
-                'timestamp': datetime.now().isoformat()
+                "success": False,
+                "message": f"Ошибка: {e!s}",
+                "timestamp": datetime.now().isoformat(),
             }
 
 
@@ -281,12 +283,12 @@ class NewsDigestApplication:
     async def initialize(self):
         """Инициализация всех компонентов приложения"""
         from app.configs.config import config
+        from app.parsers.parser_manager import ParserManager
         from app.scheduler.continuous_scheduler import ContinuousScheduler
         from app.scheduler.digest_scheduler import DigestScheduler
-        from app.scheduler.single_pass_scheduler import SinglePassScheduler
-        from app.parsers.parser_manager import ParserManager
-        from app.web import create_app
         from app.scheduler.scheduler_manager import SchedulerManager
+        from app.scheduler.single_pass_scheduler import SinglePassScheduler
+        from app.web import create_app
 
         logger.info("🚀 Инициализация News Digest Application...")
 
@@ -299,8 +301,7 @@ class NewsDigestApplication:
             self.digest_scheduler = DigestScheduler(schedule_publish=True)
         elif config.app.bypassing_method == "ONCE":
             self.single_pass_scheduler = SinglePassScheduler(
-                self.parser_manager,
-                digest_publisher=self.digest_scheduler
+                self.parser_manager, digest_publisher=self.digest_scheduler
             )
             self.digest_scheduler = DigestScheduler(schedule_publish=False)
 
@@ -309,11 +310,7 @@ class NewsDigestApplication:
         scheduler_manager.set_dependencies(self.parser_manager, self.digest_scheduler)
 
         # 4. Инициализация Flask приложения
-        self.flask_app = create_app(
-            self.digest_scheduler,
-            self.parser_manager,
-            scheduler_manager
-        )
+        self.flask_app = create_app(self.digest_scheduler, self.parser_manager, scheduler_manager)
 
         logger.info("✅ Все компоненты приложения инициализированы")
 
@@ -336,10 +333,7 @@ class NewsDigestApplication:
 
         try:
             # Запускаем Flask в отдельном потоке
-            self.flask_thread = threading.Thread(
-                target=self.run_flask,
-                daemon=True
-            )
+            self.flask_thread = threading.Thread(target=self.run_flask, daemon=True)
             self.flask_thread.start()
 
             # Создаём задачи для всех планировщиков
@@ -347,23 +341,22 @@ class NewsDigestApplication:
                 # Digest Scheduler (периодические дайджесты)
                 asyncio.create_task(
                     self._run_scheduler(self.digest_scheduler, "digest_scheduler"),
-                    name="digest_scheduler"
+                    name="digest_scheduler",
                 )
-
             ]
 
             if config.app.bypassing_method == "LOOP":
                 tasks.append(
                     asyncio.create_task(
                         self._run_scheduler(self.continuous_scheduler, "continuous_scheduler"),
-                        name="continuous_scheduler"
+                        name="continuous_scheduler",
                     ),
                 )
             elif config.app.bypassing_method == "ONCE":
                 tasks.append(
                     asyncio.create_task(
                         self._run_scheduler(self.single_pass_scheduler, "single_pass_scheduler"),
-                        name="single_pass_scheduler"
+                        name="single_pass_scheduler",
                     ),
                 )
                 # Ожидаем завершения всех задач
@@ -385,7 +378,7 @@ class NewsDigestApplication:
             host=config.app.web_host,
             port=config.app.web_port,
             debug=config.app.debug,
-            use_reloader=False
+            use_reloader=False,
         )
 
     async def _run_scheduler(self, scheduler, name):

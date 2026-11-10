@@ -103,6 +103,41 @@
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="once_digest_count" class="form-label">Дайджестов за single-pass</label>
+                            <input type="number" class="form-control" id="once_digest_count" name="once_digest_count" min="1" max="20">
+                            <div class="form-text">ONCE_DIGEST_COUNT: сколько daily-дайджестов подряд после единичного прохода (1–20)</div>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-3 mb-3 text-muted border-bottom pb-2">
+                        <i class="bi bi-intersect"></i> Семантическая дедупликация
+                    </h6>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="dedup_enabled" name="dedup_enabled">
+                                <label class="form-check-label" for="dedup_enabled">Включить дедуп</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dedup_similarity_threshold" class="form-label">Порог похожести</label>
+                            <input type="number" class="form-control" id="dedup_similarity_threshold" step="0.01" min="0" max="1">
+                            <div class="form-text">DEDUP_SIMILARITY_THRESHOLD (косинус)</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dedup_lookback_hours" class="form-label">Окно сравнения (ч)</label>
+                            <input type="number" class="form-control" id="dedup_lookback_hours" min="0">
+                            <div class="form-text">0 = как MAX_NEWS_TIME_PERIOD</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dedup_embedding_model" class="form-label">Модель fastembed</label>
+                            <input type="text" class="form-control" id="dedup_embedding_model">
+                            <div class="form-text">По умолчанию intfloat/multilingual-e5-small</div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-secondary me-2" onclick="loadGeneralSettings()">
                             <i class="bi bi-arrow-clockwise"></i> Сбросить
@@ -200,6 +235,11 @@
                         <label for="groq_api_key" class="form-label">API Key</label>
                         <input type="text" class="form-control" id="groq_api_key" name="groq_api_key">
                         <div class="form-text">Groq API Key для обработки LLM</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="llm_api_base_url" class="form-label">API Base URL</label>
+                        <input type="text" class="form-control" id="llm_api_base_url" name="llm_api_base_url">
+                        <div class="form-text">LLM_API_BASE_URL (OpenAI-совместимый endpoint, по умолчанию Groq)</div>
                     </div>
 
                     <div class="d-flex justify-content-end">

@@ -3,6 +3,7 @@
 Наследует общую логику от BaseScheduler.
 Отличительная особенность: cycle=True для бесконечного цикла.
 """
+
 import logging
 
 from app.scheduler.base_scheduler import BaseScheduler
@@ -27,9 +28,4 @@ class ContinuousScheduler(BaseScheduler):
         Args:
             parser_manager: менеджер парсеров
         """
-        super().__init__(
-            parser_manager,
-            sync_manager,
-            scheduler_type="continuous",
-            cycle=True
-        )
+        super().__init__(parser_manager, sync_manager, scheduler_type="continuous", cycle=True)

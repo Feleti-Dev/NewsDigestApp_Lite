@@ -42,13 +42,13 @@ def setup_logging():
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     # КАСТОМИЗАЦИЯ ИМЕНИ РОТАЦИИ
     # Превращаем name.log.1 -> name_1.log
     def custom_namer(default_name):
-        base, ext, num = default_name.rsplit('.', 2)  # Разбиваем путь.log.1
+        base, _ext, num = default_name.rsplit(".", 2)  # Разбиваем путь.log.1
         return f"{base}_{num}.log"
 
     file_handler.namer = custom_namer

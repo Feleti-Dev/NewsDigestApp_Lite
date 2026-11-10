@@ -7,7 +7,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.configs.config import config
 from app.database.models import ChannelSource
@@ -40,7 +40,7 @@ class BaseScheduler:
         sync_manager,
         scheduler_type: str = "base",
         cycle: bool = False,
-        digest_publisher=None
+        digest_publisher=None,
     ):
         """
         Инициализация базового планировщика.
@@ -64,14 +64,14 @@ class BaseScheduler:
 
         # Храним каналы в памяти для быстрого доступа
         # {source_type: [ChannelSource, ...]}
-        self._channels_by_source: Dict[str, list[ChannelSource]] = {}
+        self._channels_by_source: dict[str, list[ChannelSource]] = {}
 
         # Индексы каналов для всех источников
-        self._channel_indices: Dict[str, int] = {}
+        self._channel_indices: dict[str, int] = {}
 
-        self.tasks: Dict[str, asyncio.Task] = {}
+        self.tasks: dict[str, asyncio.Task] = {}
         self.is_running = False
-        self.start_time: Optional[datetime] = None
+        self.start_time: datetime | None = None
         self.loop = None
 
     async def initialize(self):
@@ -99,7 +99,7 @@ class BaseScheduler:
 
         logger.info("[Scheduler]✅ Инициализация завершена")
 
-    def _get_next_channel(self, source_type: str) -> Optional[ChannelSource]:
+    def _get_next_channel(self, source_type: str) -> ChannelSource | None:
         """
         Получение следующего канала для обработки.
 
@@ -127,11 +127,11 @@ class BaseScheduler:
 
         if current_index >= len(active_channels):
             if self.cycle:
-            # Циклический режим: переходим на начало при достижении конца
+                # Циклический режим: переходим на начало при достижении конца
                 current_index = 0
                 self._channel_indices[source_type] = 0
             else:
-            # Последовательный режим: возвращаем None когда каналы закончились
+                # Последовательный режим: возвращаем None когда каналы закончились
                 logger.debug(f"[Scheduler]Все каналы для {source_type} обработаны")
                 return None
 
@@ -211,29 +211,26 @@ class BaseScheduler:
             if not news_items:
                 # Успешно, но новостей нет
                 self.db_manager.update_channel_result(
-                    channel.channel_id,
-                    source_type,
-                    success=True,
-                    news_count=0
+                    channel.channel_id, source_type, success=True, news_count=0
                 )
                 logger.info(f"[Scheduler]📭 {channel.channel_id}: новостей не найдено")
                 return 0
 
             # Фильтрация по порогу полезности
-            logger.info(f"[Scheduler]🔍 Фильтрация новостей по порогу полезности {config.app.interest_threshold}...")
+            logger.info(
+                f"[Scheduler]🔍 Фильтрация новостей по порогу полезности {config.app.interest_threshold}..."
+            )
             filtered_news = await parser.filter_by_interest_threshold(news_items)
 
             # Сохранение в базу данных
             logger.debug(f"[Scheduler]Сохранение {len(filtered_news)} новостей в БД")
-            saved_count = parser.save_to_database(filtered_news)
+            saved_count = await parser.save_to_database(filtered_news)
 
             # Расчет средней оценки
             avg_score = 0.0
             if filtered_news:
                 scores = [
-                    n.get('Interest_score', 0)
-                    for n in filtered_news
-                    if n.get('Interest_score')
+                    n.get("Interest_score", 0) for n in filtered_news if n.get("Interest_score")
                 ]
                 avg_score = sum(scores) / len(scores) if scores else 0.0
 
@@ -243,17 +240,17 @@ class BaseScheduler:
                 source_type,
                 success=True,
                 news_count=saved_count,
-                avg_score=avg_score
+                avg_score=avg_score,
             )
 
-            logger.info(f"[Scheduler]✅ Канал {channel.channel_id}: собрано {saved_count} новостей, средний балл {avg_score:.4f}")
+            logger.info(
+                f"[Scheduler]✅ Канал {channel.channel_id}: собрано {saved_count} новостей, средний балл {avg_score:.4f}"
+            )
             return saved_count
 
         except Exception as e:
             logger.error(f"[Scheduler]❌ Ошибка обработки канала {channel.channel_id}: {e}")
-            self.db_manager.update_channel_result(
-                channel.channel_id, source_type, success=False
-            )
+            self.db_manager.update_channel_result(channel.channel_id, source_type, success=False)
             return 0
 
     def _check_parser_needs_restart(self, source_type: str) -> bool:
@@ -276,7 +273,7 @@ class BaseScheduler:
         # Если более половины каналов имеют ошибки, парсер проблемный
         return recent_failures > len(channels) / 2
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         Получение текущего статуса планировщика для фронтенда.
 
@@ -287,30 +284,30 @@ class BaseScheduler:
         all_channels = self.db_manager.get_channels_list()
 
         # Группируем каналы по источникам
-        channels_by_source: Dict[str, list[Dict]] = {}
+        channels_by_source: dict[str, list[dict]] = {}
         for ch in all_channels:
-            st = ch['source_type']
+            st = ch["source_type"]
             if st not in channels_by_source:
                 channels_by_source[st] = []
             channels_by_source[st].append(ch)
 
         # Формируем статистику по источникам
-        stats: Dict[str, Any] = {}
+        stats: dict[str, Any] = {}
         for src_type, channels in channels_by_source.items():
-            active_channels = [ch for ch in channels if ch['is_active']]
-            success = sum(ch['success_count'] for ch in channels)
-            failure = sum(ch['failure_count'] for ch in channels)
+            active_channels = [ch for ch in channels if ch["is_active"]]
+            success = sum(ch["success_count"] for ch in channels)
+            failure = sum(ch["failure_count"] for ch in channels)
             total_ops = success + failure
 
             stats[src_type] = {
-                'total_channels': len(channels),
-                'active_channels': len(active_channels),
-                'inactive_channels': len(channels) - len(active_channels),
-                'success_rate': round((success / total_ops * 100) if total_ops > 0 else 0, 1),
-                'total_success': success,
-                'total_failure': failure,
-                'total_news_collected': sum(ch['news_collected'] for ch in channels),
-                'channels': channels,
+                "total_channels": len(channels),
+                "active_channels": len(active_channels),
+                "inactive_channels": len(channels) - len(active_channels),
+                "success_rate": round((success / total_ops * 100) if total_ops > 0 else 0, 1),
+                "total_success": success,
+                "total_failure": failure,
+                "total_news_collected": sum(ch["news_collected"] for ch in channels),
+                "channels": channels,
             }
 
         # Общая статистика
@@ -318,21 +315,19 @@ class BaseScheduler:
             "total_sources": len(stats),
             "scheduler_type": self.scheduler_type,
             "cycle_mode": self.cycle,
-            "uptime": (
-                str(datetime.now() - self.start_time)
-                if self.start_time
-                else None
-            ),
+            "uptime": (str(datetime.now() - self.start_time) if self.start_time else None),
         }
 
         # Формируем активные задачи
         active_tasks = []
         for task_name, task in self.tasks.items():
-            active_tasks.append({
-                "name": task_name,
-                "running": not task.done(),
-                "cancelled": task.cancelled(),
-            })
+            active_tasks.append(
+                {
+                    "name": task_name,
+                    "running": not task.done(),
+                    "cancelled": task.cancelled(),
+                }
+            )
 
         # Полный статус
         status = {
@@ -340,9 +335,7 @@ class BaseScheduler:
             "is_running": self.is_running,
             "is_finished": self._check_finished(),
             "start_time": self.start_time.isoformat() if self.start_time else None,
-            "uptime": (
-                str(datetime.now() - self.start_time) if self.start_time else None
-            ),
+            "uptime": (str(datetime.now() - self.start_time) if self.start_time else None),
             "tasks_running": len([t for t in self.tasks.values() if not t.done()]),
             "statistics": stats,
             "active_tasks": active_tasks,
@@ -365,7 +358,6 @@ class BaseScheduler:
                 task.cancel()
         self.tasks = {}
         logger.info(f"[Scheduler]✅ {self.scheduler_type.upper()} Scheduler остановлен")
-
 
     def _start_source_task(self, source_type: str):
         """
@@ -406,9 +398,7 @@ class BaseScheduler:
 
                 # Проверяем, не требуется ли перезапуск парсера
                 if self._check_parser_needs_restart(source_type):
-                    logger.warning(
-                        f"Парсер {source_type} требует внимания. Пропускаем."
-                    )
+                    logger.warning(f"Парсер {source_type} требует внимания. Пропускаем.")
                     await asyncio.sleep(60)
                     continue
 
@@ -425,9 +415,7 @@ class BaseScheduler:
 
                 # Ждем указанный интервал между каналами
                 interval = config.scheduler.get_interval(source_type)
-                logger.debug(
-                    f"Ждем {interval} секунд до следующего канала {source_type}"
-                )
+                logger.debug(f"Ждем {interval} секунд до следующего канала {source_type}")
                 await asyncio.sleep(interval)
 
             except asyncio.CancelledError:
@@ -481,8 +469,8 @@ class BaseScheduler:
                     for source_type, source_stats in status["statistics"].items():
                         if source_type != "overall":
                             total_news = sum(
-                                ch.get('news_collected', 0)
-                                for ch in source_stats.get('channels', [])
+                                ch.get("news_collected", 0)
+                                for ch in source_stats.get("channels", [])
                             )
                             logger.info(
                                 f"📊 {source_type}: "
@@ -538,7 +526,6 @@ class BaseScheduler:
         Override in subclasses to add custom behavior (e.g., digest publishing).
         """
         logger.info("[Scheduler]📋 Все источники обработаны")
-        pass
 
     async def _execute_digest_with_retry(self, digest_type: str, is_test: bool = False):
         """
@@ -561,7 +548,7 @@ class BaseScheduler:
         Единая реализация для всех типов планировщиков.
         """
         self.tasks = {}
-        self._channel_indices={}
+        self._channel_indices = {}
 
         self.loop = asyncio.get_running_loop()
 
@@ -591,7 +578,9 @@ class BaseScheduler:
             for source_type in source_types:
                 self._start_source_task(source_type)
 
-            logger.info(f"[Scheduler]✅ {self.scheduler_type.upper()} Scheduler: запущено {len(source_types)} источников")
+            logger.info(
+                f"[Scheduler]✅ {self.scheduler_type.upper()} Scheduler: запущено {len(source_types)} источников"
+            )
 
             # Для циклического режима запускаем доп. задачи
             if self.cycle:

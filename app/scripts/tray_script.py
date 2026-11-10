@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import logging
+import os
 import platform
 import sys
-import os
 import winreg  # Для работы с реестром Windows
 
-if sys.platform == 'win32':
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 # Настраиваем простой логгер в stdout
 logging.basicConfig(
     level=logging.INFO,
-    format='%(levelname)s: %(message)s',
+    format="%(levelname)s: %(message)s",
     stream=sys.stdout,
-    force=True
+    force=True,
 )
 logger = logging.getLogger("TraySubprocess")
 
 
 def is_macos() -> bool:
-    return platform.system() == 'Darwin'
+    return platform.system() == "Darwin"
 
 
 def is_windows() -> bool:
-    return platform.system() == 'Windows'
+    return platform.system() == "Windows"
 
 
 class AutostartManager:
     """Управление автозапуском в реестре Windows"""
+
     APP_NAME = "NewsDigestApp"
 
     def __init__(self, app_path):
@@ -49,9 +49,12 @@ class AutostartManager:
     def is_enabled(self) -> bool:
         """Проверяет, включен ли автозапуск"""
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                 r"Software\Microsoft\Windows\CurrentVersion\Run",
-                                 0, winreg.KEY_READ)
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_READ,
+            )
             winreg.QueryValueEx(key, self.APP_NAME)
             winreg.CloseKey(key)
             return True
@@ -85,7 +88,7 @@ class AutostartManager:
             logger.error(f"Ошибка изменения автозапуска: {e}")
 
 
-def main(port: int, shutdown_pipe: str, app_path: str, server_url: str = None):
+def main(port: int, shutdown_pipe: str, app_path: str, server_url: str | None = None):
     sys.path.insert(0, app_path)
 
     if server_url is None:
@@ -95,15 +98,16 @@ def main(port: int, shutdown_pipe: str, app_path: str, server_url: str = None):
     autostart = AutostartManager(app_path)
 
     try:
-        from pystray import MenuItem as Item, Menu as Menu, Icon
         from PIL import Image, ImageDraw
+        from pystray import Icon, Menu
+        from pystray import MenuItem as Item
     except ImportError:
         logger.error("Библиотека pystray или PIL не найдена!")
         sys.exit(1)
 
     # Генерация иконки
     def create_image():
-        image = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         draw = ImageDraw.Draw(image)
         draw.rectangle([4, 4, 60, 60], fill=(33, 150, 243), outline=(25, 118, 210), width=2)
         return image
@@ -111,14 +115,15 @@ def main(port: int, shutdown_pipe: str, app_path: str, server_url: str = None):
     def quit_action(icon, item):
         logger.info("Пользователь нажал 'Выход'")
         try:
-            with open(shutdown_pipe, 'w') as f:
-                f.write('quit')
-        except:
-            pass
+            with open(shutdown_pipe, "w") as f:
+                f.write("quit")
+        except OSError as err:
+            logger.debug("Не удалось записать shutdown_pipe: %s", err)
         icon.stop()
 
     def open_browser(icon, item):
         import webbrowser
+
         logger.info(f"Открываем браузер: {server_url}")
         webbrowser.open(server_url)
 
@@ -130,14 +135,23 @@ def main(port: int, shutdown_pipe: str, app_path: str, server_url: str = None):
     # Создание меню
     # checked=lambda item: autostart.is_enabled() - динамически проверяет состояние галочки
     menu = Menu(
-        Item('Открыть News Digest', open_browser, default=True),
+        Item("Открыть News Digest", open_browser, default=True),
         Menu.SEPARATOR,
-        Item('Запускать при старте', toggle_autostart_action, checked=lambda item: autostart.is_enabled()),
+        Item(
+            "Запускать при старте",
+            toggle_autostart_action,
+            checked=lambda item: autostart.is_enabled(),
+        ),
         Menu.SEPARATOR,
-        Item('Выход', quit_action)
+        Item("Выход", quit_action),
     )
 
-    icon = Icon("news_digest", Image.open(os.path.join(app_path, "app", "web", "static", "favicons", "favicon_alt.ico")), "News Digest", menu=menu)
+    icon = Icon(
+        "news_digest",
+        Image.open(os.path.join(app_path, "app", "web", "static", "favicons", "favicon_alt.ico")),
+        "News Digest",
+        menu=menu,
+    )
 
     logger.info("Иконка трея запущена и готова")
     icon.run()

@@ -2,11 +2,12 @@
 Конфигурация приложения.
 Содержит все настройки, загружаемые из переменных окружения.
 """
+
 import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -45,7 +46,7 @@ class APIConfig:
     telegram_api_id: str = os.getenv("TELEGRAM_API_ID", "")
     telegram_api_hash: str = os.getenv("TELEGRAM_API_HASH", "")
     telegram_2fa_password: str = os.getenv("TELEGRAM_2FA_PASSWORD", "")
-    telegram_phone: str  = os.getenv("TELEGRAM_PHONE", "")
+    telegram_phone: str = os.getenv("TELEGRAM_PHONE", "")
 
     # Twitter/X API v2 (Essential или Elevated access)
     twitter_bearer_token: str = os.getenv("TWITTER_BEARER_TOKEN", "")
@@ -58,6 +59,7 @@ class APIConfig:
     # YouTube
     youtube_api_key: str = os.getenv("YOUTUBE_API_KEY", "")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    llm_api_base_url: str = os.getenv("LLM_API_BASE_URL", "https://api.groq.com/openai/v1")
 
 
 @dataclass
@@ -65,7 +67,9 @@ class AppConfig:
     """Основная конфигурация приложения"""
 
     # Пути - ВАЖНО: вычисляем от корня проекта
-    base_dir: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # news_digest_app/
+    base_dir: str = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )  # news_digest_app/
     data_dir: str = os.path.join(base_dir, "data")
     logs_dir: str = os.path.join(data_dir, "logs")
 
@@ -83,6 +87,14 @@ class AppConfig:
     max_news_per_channel: int = int(os.getenv("MAX_NEWS_PER_CHANNEL", "5"))
     max_news_per_digest: int = int(os.getenv("MAX_NEWS_PER_DIGEST", "5"))
     max_news_time_period: int = int(os.getenv("MAX_NEWS_TIME_PERIOD", "24"))
+    once_digest_count: int = max(1, min(20, int(os.getenv("ONCE_DIGEST_COUNT", "1"))))
+
+    dedup_enabled: bool = os.getenv("DEDUP_ENABLED", "TRUE").upper() == "TRUE"
+    dedup_similarity_threshold: float = float(os.getenv("DEDUP_SIMILARITY_THRESHOLD", "0.86"))
+    dedup_lookback_hours: int = int(os.getenv("DEDUP_LOOKBACK_HOURS", "0"))
+    dedup_embedding_model: str = os.getenv(
+        "DEDUP_EMBEDDING_MODEL", "intfloat/multilingual-e5-small"
+    )
 
     # Веб-интерфейс, ПОКА НЕ РАБОЧИЕ
     web_host: str = os.getenv("WEB_HOST", "0.0.0.0")
@@ -96,7 +108,7 @@ class AppConfig:
     model_type: str = os.getenv("MODEL_TYPE", "LOCAL")
 
     # Топик(тематика)
-    topic: str = os.getenv("TOPIC", 'Искусственный интеллект')
+    topic: str = os.getenv("TOPIC", "Искусственный интеллект")
 
     # Статусы парсеров
     parser_status: dict = field(
@@ -108,21 +120,39 @@ class AppConfig:
         }
     )
 
-    def update_from_dict(self, updates: Dict[str, Any]) -> None:
+    def effective_dedup_lookback_hours(self) -> int:
+        """Часы окна семантической дедупликации (0 в конфиге → MAX_NEWS_TIME_PERIOD)."""
+        if self.dedup_lookback_hours > 0:
+            return self.dedup_lookback_hours
+        return self.max_news_time_period
+
+    def update_from_dict(self, updates: dict[str, Any]) -> None:
         """Обновление полей из словаря"""
         for key, value in updates.items():
             if hasattr(self, key):
                 # Преобразование типов для специфических полей
-                if key == 'parser_status' and isinstance(value, dict):
+                if key == "parser_status" and isinstance(value, dict):
                     self.parser_status.update(value)
-                elif key == 'debug' and isinstance(value, str):
+                elif key in ("debug", "dedup_enabled") and isinstance(value, str):
                     setattr(self, key, value.lower() == "true")
-                elif key == 'bypassing_method':
+                elif key == "bypassing_method":
                     setattr(self, key, value)
-                elif key in ('interest_threshold', 'max_news_per_channel',
-                            'max_news_per_digest', 'max_news_time_period',
-                            'web_port', 'model_type', 'topic'):
+                elif key == "once_digest_count":
+                    setattr(self, key, max(1, min(20, int(value))))
+                elif key in (
+                    "interest_threshold",
+                    "max_news_per_channel",
+                    "max_news_per_digest",
+                    "max_news_time_period",
+                    "dedup_lookback_hours",
+                    "dedup_similarity_threshold",
+                    "web_port",
+                    "model_type",
+                    "topic",
+                ):
                     setattr(self, key, type(getattr(self, key))(value))
+                elif key == "dedup_embedding_model":
+                    setattr(self, key, str(value))
                 else:
                     logger.warning(f"Спорный ключ {key}:{value}")
                     setattr(self, key, value)
@@ -138,7 +168,7 @@ class SchedulerConfig:
     """Конфигурация непрерывного планировщика"""
 
     # Интервалы между каналами в секундах
-    intervals: Dict[str, int] = None
+    intervals: dict[str, int] = None
 
     # Файлы для сохранения состояния
     state_dir: str = None
@@ -174,8 +204,12 @@ class SchedulerConfig:
 
         # Создаем директорию для состояния
         self.state_dir = os.path.join(
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data"),
-            "scheduler_state")
+            os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "data",
+            ),
+            "scheduler_state",
+        )
         os.makedirs(self.state_dir, exist_ok=True)
 
         self.state_file = os.path.join(self.state_dir, "scheduler_state.json")
@@ -186,23 +220,24 @@ class SchedulerConfig:
         """Получение интервала для типа источника"""
         return self.intervals.get(source_type, 10)  # По умолчанию 10 секунд
 
-    def update_intervals(self, new_intervals: Dict[str, int]) -> None:
+    def update_intervals(self, new_intervals: dict[str, int]) -> None:
         """Обновление интервалов"""
         for source, value in new_intervals.items():
             if source in self.intervals:
                 self.intervals[source] = int(value)
 
-    def update_digest_schedule(self, digest_type: str, schedule: Dict[str, Any]) -> None:
+    def update_digest_schedule(self, digest_type: str, schedule: dict[str, Any]) -> None:
         """Обновление расписания дайджеста"""
         logger.info(f"update_digest_schedule: {digest_type}, {schedule}")
-        if digest_type == 'daily':
+        if digest_type == "daily":
             self.daily_digest.update(json.loads(schedule))
-        elif digest_type == 'weekly':
+        elif digest_type == "weekly":
             self.weekly_digest.update(json.loads(schedule))
-        elif digest_type == 'monthly':
+        elif digest_type == "monthly":
             self.monthly_digest.update(json.loads(schedule))
-        elif digest_type == 'daily_single_pass':
+        elif digest_type == "daily_single_pass":
             self.daily_single_pass.update(json.loads(schedule))
+
 
 class Config:
     """Главный класс конфигурации"""
@@ -213,25 +248,27 @@ class Config:
         self.google_sheets = GoogleSheetsConfig()
         self.scheduler = SchedulerConfig()
 
-    def update_config(self, section: str, updates: Dict[str, Any]) -> bool:
+    def update_config(self, section: str, updates: dict[str, Any]) -> bool:
         """Унифицированное обновление конфигурации"""
         # Если передан один ключ-значение (не словарь), преобразуем в словарь
         if not isinstance(updates, dict):
             logger.warning(f"updates не является словарём: {type(updates)}")
             return False
         try:
-            if section == 'app':
+            if section == "app":
                 self.app.update_from_dict(updates)
-            elif section == 'scheduler':
-                if 'daily_digest' in updates:
-                    self.scheduler.update_digest_schedule('daily', updates['daily_digest'])
-                if 'weekly_digest' in updates:
-                    self.scheduler.update_digest_schedule('weekly', updates['weekly_digest'])
-                if 'monthly_digest' in updates:
-                    self.scheduler.update_digest_schedule('monthly', updates['monthly_digest'])
-                if  "daily_single_pass" in updates:
-                    self.scheduler.update_digest_schedule('daily_single_pass', updates['daily_single_pass'])
-            elif section == 'api':
+            elif section == "scheduler":
+                if "daily_digest" in updates:
+                    self.scheduler.update_digest_schedule("daily", updates["daily_digest"])
+                if "weekly_digest" in updates:
+                    self.scheduler.update_digest_schedule("weekly", updates["weekly_digest"])
+                if "monthly_digest" in updates:
+                    self.scheduler.update_digest_schedule("monthly", updates["monthly_digest"])
+                if "daily_single_pass" in updates:
+                    self.scheduler.update_digest_schedule(
+                        "daily_single_pass", updates["daily_single_pass"]
+                    )
+            elif section == "api":
                 for key, value in updates.items():
                     if hasattr(self.api, key):
                         setattr(self.api, key, value)
@@ -239,19 +276,20 @@ class Config:
                         setattr(self.google_sheets, key, value)
                     else:
                         logger.warning(f"Спорная Api настройка: {key}:{value}")
-            elif section == 'parsers':
-                    logger.info(updates)
-                    short_update = transform_to_short_name(updates, "INTERVAL")
-                    logger.info(short_update)
-                    if short_update:
-                        self.scheduler.intervals.update(short_update)
-                    short_update = transform_to_short_name(updates, "ACTIVE")
-                    logger.info(short_update)
-                    if short_update:
-                        self.app.parser_status.update(short_update)
+            elif section == "parsers":
+                logger.info(updates)
+                short_update = transform_to_short_name(updates, "INTERVAL")
+                logger.info(short_update)
+                if short_update:
+                    self.scheduler.intervals.update(short_update)
+                short_update = transform_to_short_name(updates, "ACTIVE")
+                logger.info(short_update)
+                if short_update:
+                    self.app.parser_status.update(short_update)
             return True
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Ошибка обновления конфигурации: {e}")
             return False
 
@@ -266,7 +304,8 @@ class Config:
 # Глобальный экземпляр конфигурации
 config = Config()
 
-def transform_to_short_name(updates: Dict[str, Any], type_key: str) -> Dict[str, int]:
+
+def transform_to_short_name(updates: dict[str, Any], type_key: str) -> dict[str, int]:
     """
     Трансформация ключей парсеров из формата пользователя в формат config.
 
@@ -274,18 +313,18 @@ def transform_to_short_name(updates: Dict[str, Any], type_key: str) -> Dict[str,
     Выход: {"twitter": 910, "telegram": 7, "youtube": 5}
     """
     SOURCE_MAPPING = {
-        'TWITTER': 'twitter',
-        'TELEGRAM': 'telegram',
-        'YOUTUBE': 'youtube',
-        'REDDIT': 'reddit',
+        "TWITTER": "twitter",
+        "TELEGRAM": "telegram",
+        "YOUTUBE": "youtube",
+        "REDDIT": "reddit",
     }
     result = {}
     for key, value in updates.items():
         # Проверяем, начинается ли ключ с названия источника
         for source_key, config_key in SOURCE_MAPPING.items():
-            if key.upper().startswith(f"{source_key}_{type_key}") :
+            if key.upper().startswith(f"{source_key}_{type_key}"):
                 try:
-                    result[config_key] = value=="TRUE" if type_key == 'ACTIVE' else int(value)
+                    result[config_key] = value == "TRUE" if type_key == "ACTIVE" else int(value)
                 except (ValueError, TypeError):
                     logger.warning(f"Не удалось преобразовать интервал {key}={value} в число")
                 break

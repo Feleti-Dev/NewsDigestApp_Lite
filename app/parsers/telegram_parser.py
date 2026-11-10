@@ -2,11 +2,13 @@ import getpass
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from telethon.errors import SessionPasswordNeededError
-from app.configs import config
 from telethon.tl.types import PeerChannel
+
+from app.configs import config
+
 from .base_parser import BaseParser
 
 logger = logging.getLogger(__name__)
@@ -19,13 +21,12 @@ class TelegramParser(BaseParser):
         super().__init__("Telegram")
         self.client = None
         self.session_file = "data/telegram_session.session"
-        self._phone: Optional[str] = None
-        self._two_fa_password: Optional[str] = None
+        self._phone: str | None = None
+        self._two_fa_password: str | None = None
         self._init_client()
 
     def _init_client(self):
         """Инициализация клиента Telethon с сохраненной сессией"""
-
 
         api_id = config.api.telegram_api_id
         api_hash = config.api.telegram_api_hash
@@ -67,7 +68,7 @@ class TelegramParser(BaseParser):
             logger.error(f"[Telegram] Ошибка инициализации Telethon: {e}")
             self.client = None
 
-    def _get_2fa_password(self) -> Optional[str]:
+    def _get_2fa_password(self) -> str | None:
         """
         Получение пароля 2FA из конфигурации или другого источника
 
@@ -78,22 +79,22 @@ class TelegramParser(BaseParser):
         # 1. Уже загруженный из конфигурации
         # 2. Переменная окружения
 
-
         if self._two_fa_password:
             return self._two_fa_password
 
         # Пробуем из переменной окружения
-        env_password = os.getenv('TELEGRAM_2FA_PASSWORD', "")
+        env_password = os.getenv("TELEGRAM_2FA_PASSWORD", "")
         if env_password and env_password != "":
-            logger.info("[Telegram] Пароль 2FA загружен из переменной окружения TELEGRAM_2FA_PASSWORD")
+            logger.info(
+                "[Telegram] Пароль 2FA загружен из переменной окружения TELEGRAM_2FA_PASSWORD"
+            )
             return env_password
-
 
         return None
 
     def _code_callback(self) -> str:
         """Колбэк для получения кода из консоли (интерактивный режим)"""
-        logger.info(f"[Telegram] Введите код из Telegram: ")
+        logger.info("[Telegram] Введите код из Telegram: ")
         return input()
 
     def _password_callback(self) -> str:
@@ -101,14 +102,14 @@ class TelegramParser(BaseParser):
         password = self._get_2fa_password()
         if password:
             return password
-        logger.info(f"[Telegram] Введите пароль 2FA: ")
+        logger.info("[Telegram] Введите пароль 2FA: ")
         return getpass.getpass()
 
     def _phone_callback(self) -> str:
         """Колбэк для получения номера телефона"""
         if self._phone and self._phone != "":
             return self._phone
-        logger.info(f"[Telegram] Введите номер телефона (375291234567): ")
+        logger.info("[Telegram] Введите номер телефона (375291234567): ")
         return input()
 
     async def _authenticate(self) -> bool:
@@ -194,9 +195,7 @@ class TelegramParser(BaseParser):
 
         return False
 
-    async def fetch_channel_news(
-            self, channel_url: str, channel_id: str
-    ) -> List[Dict[str, Any]]:
+    async def fetch_channel_news(self, channel_url: str, channel_id: str) -> list[dict[str, Any]]:
         """
         Получение сообщений с Telegram канала
         """
@@ -217,12 +216,9 @@ class TelegramParser(BaseParser):
                 logger.error("[Telegram] Не удалось авторизоваться в Telegram")
                 return []
 
-
-
-
             # Получаем сущность канала
             try:
-                dialogs = await self.client.get_dialogs()
+                await self.client.get_dialogs()
                 entity = None
                 if "-100" == channel_id[:4]:
                     entity = await self.client.get_entity(PeerChannel(int(channel_id)))
@@ -238,13 +234,11 @@ class TelegramParser(BaseParser):
             try:
                 time_limit = datetime.now(tz=timezone.utc) - self.collection_period
                 async for message in self.client.iter_messages(
-                        entity, limit=config.app.max_news_per_channel, reverse=False
+                    entity, limit=config.app.max_news_per_channel, reverse=False
                 ):
                     # Проверяем возраст сообщения
                     message_date = (
-                        message.date.replace(tzinfo=timezone.utc)
-                        if message.date
-                        else None
+                        message.date.replace(tzinfo=timezone.utc) if message.date else None
                     )
                     if message_date and message_date < time_limit:
                         continue
@@ -268,7 +262,7 @@ class TelegramParser(BaseParser):
             logger.error(f"[Telegram] Ошибка при получении сообщений из {channel_id}: {e}")
             return []
 
-    def extract_news_data(self, raw_data: Any) -> Dict[str, Any]:
+    def extract_news_data(self, raw_data: Any) -> dict[str, Any]:
         """Извлечение данных из сообщения Telegram"""
         try:
             message = raw_data
@@ -287,8 +281,8 @@ class TelegramParser(BaseParser):
                     if hasattr(message.peer_id, "channel_id"):
                         channel_id = message.peer_id.channel_id
                         url = f"https://t.me/c/{channel_id}/{message.id}"
-                except:
-                    pass
+                except (AttributeError, TypeError, ValueError):
+                    logger.debug("Не удалось построить URL Telegram по peer_id")
 
             # Получаем текст сообщения
             text = getattr(message, "text", getattr(message, "message", ""))
@@ -328,12 +322,13 @@ class TelegramParser(BaseParser):
                 if hasattr(message.media, "photo"):
                     news_data["has_image"] = True
                     news_data["note"] += "; has_photo=True"
-                elif hasattr(message.media, "document"):
-                    if hasattr(
-                            message.media.document, "mime_type"
-                    ) and message.media.document.mime_type.startswith("image/"):
-                        news_data["has_image"] = True
-                        news_data["note"] += "; has_document_image=True"
+                elif (
+                    hasattr(message.media, "document")
+                    and hasattr(message.media.document, "mime_type")
+                    and message.media.document.mime_type.startswith("image/")
+                ):
+                    news_data["has_image"] = True
+                    news_data["note"] += "; has_document_image=True"
 
             # Ограничиваем длину текста
             # if news_data["text"] and len(news_data["text"]) > 3000:
@@ -353,5 +348,5 @@ class TelegramParser(BaseParser):
             try:
                 await self.client.disconnect()
             except Exception as e:
-                logger.error("[Telegram] Ошибка при закрытии парсера Telegram ", e)
+                logger.error("[Telegram] Ошибка при закрытии парсера Telegram: %s", e)
         self.client = None

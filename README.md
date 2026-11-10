@@ -37,15 +37,34 @@
 
 ## 🚀 Быстрый старт
 
-### Установка (Windows)
+### Портативная установка (Windows, как раньше)
 
 ```powershell
 # 1. Скачайте репозиторий и распакуйте
-# 2. Запустите от имени администратора:
-make_portable.ps1
+# 2. Сборка embeddable Python + зависимости:
+install.bat
+# или: powershell -ExecutionPolicy Bypass -File make_portable.ps1
 
-# 3. Запустите приложение:
+# 3. Запуск:
 run.bat
+# Тихий старт: run_silent.bat
+```
+
+Если установлен [uv](https://docs.astral.sh/uv/), `make_portable.ps1` перед `pip install` обновит `requirements.txt` из `pyproject.toml` / `uv.lock`.
+
+### Разработка на uv (Windows)
+
+```powershell
+install_dev.bat    # uv python 3.10 + uv sync
+run_dev.bat        # uv run tray.py (аналог run.bat)
+run_dev_silent.bat
+```
+
+Зависимости задаются в **`pyproject.toml`**; `requirements.txt` генерируется для portable:
+
+```powershell
+export_requirements.bat
+# uv export --format requirements-txt --no-dev --no-hashes --no-emit-project -o requirements.txt
 ```
 
 ---
@@ -159,6 +178,8 @@ YOUTUBE_API_KEY=ютуб-апи-ключ
 ```bash
 # API Key для Groq
 GROQ_API_KEY=грок-апи-ключ
+# OpenAI-совместимый base URL (по умолчанию Groq)
+LLM_API_BASE_URL=https://api.groq.com/openai/v1
 ```
 
 ### Пользовательские настройки
@@ -180,6 +201,15 @@ MAX_NEWS_PER_DIGEST=6
 
 # Максимальный возраст новостей в часах
 MAX_NEWS_TIME_PERIOD=25
+
+# Сколько daily-дайджестов подряд после единичного прохода (1–20)
+ONCE_DIGEST_COUNT=1
+
+# Семантическая дедупликация (fastembed, dense multilingual-e5-small)
+DEDUP_ENABLED=TRUE
+DEDUP_SIMILARITY_THRESHOLD=0.86
+DEDUP_LOOKBACK_HOURS=0
+DEDUP_EMBEDDING_MODEL=intfloat/multilingual-e5-small
 
 # Тип модели обработки (только LLM_API для Lite версии)
 MODEL_TYPE=LLM_API
@@ -237,7 +267,7 @@ WEB_PORT=5000
 
 ## 🛠️ Технологический стек
 
-**Backend:** Python 3.10.11+ • Flask • Quart • SQLAlchemy • APScheduler
+**Backend:** Python 3.10+ • uv / lockfile • Flask • Quart • SQLAlchemy • APScheduler
 
 **API & Парсинг:** Telethon • Tweepy • Google API Client • Groq SDK
 
@@ -270,11 +300,15 @@ news_digest_app_lite/
 ├── 📄 .env                     # Конфигурация приложения
 ├── 📄 .gitignore               # Исключения Git
 ├── 📄 main.py                  # Файл запуска только серверной части
-├── 📄 make_portable.ps1        # Скрипт создания портативной версии
-├── 📄 README.md                # Документация
-├── 📄 requirements.txt         # Зависимости Python
-├── 📄 run.bat                  # Batch-файл запуска
-├── 📄 tray.py                  # Файл запуска полного приложения(сервер+трей)
+├── 📄 make_portable.ps1        # Портативная сборка (embed + pip)
+├── 📄 install.bat              # Запуск make_portable.ps1
+├── 📄 install_dev.bat          # uv sync для разработки
+├── 📄 export_requirements.bat  # uv export → requirements.txt
+├── 📄 pyproject.toml           # Зависимости (источник истины)
+├── 📄 uv.lock                  # Lockfile uv
+├── 📄 requirements.txt         # Экспорт для python_dist/pip
+├── 📄 run.bat / run_dev.bat    # Запуск (portable / uv)
+├── 📄 tray.py                  # Полное приложение (сервер + трей)
 ├── 📂 .idea/                   # Настройки PyCharm/IDE
 ├── 📂 app/                     # Исходный код приложения
 ├── 📂 data/                    # Рабочие данные приложения
@@ -304,7 +338,7 @@ news_digest_app_lite/
 | **Оптимизация использования RAM** | Улучшение управления памятью для снижения потребления ресурсов при длительной работе приложения |
 | **Улучшение клиентской части** | Добавление спиннеров загрузки, анимаций, уведомлений и индикаторов прогресса для более отзывчивого интерфейса |
 | **Активация и деактивация каналов** | Возможность временного отключения отдельных каналов без их удаления из базы и Google Sheets |
-| **Устранение дубликатов** | Проверка на дублирование новостей перед добавлением в базу данных для исключения повторных публикаций |
+| **Устранение дубликатов** | Реализовано: дедуп по URL и похожести текста (эмбеддинги fastembed) |
 
 ---
 

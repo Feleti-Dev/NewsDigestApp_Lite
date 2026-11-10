@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import urlparse
 
 from .client import GoogleSheetsClient
@@ -20,7 +20,7 @@ class SheetsParser:
             "Reddit": "reddit",
         }
 
-    def extract_channels_from_sheet(self, sheet_name: str) -> List[Dict[str, Any]]:
+    def extract_channels_from_sheet(self, sheet_name: str) -> list[dict[str, Any]]:
         """
         Извлечение каналов из указанного листа
 
@@ -44,7 +44,7 @@ class SheetsParser:
 
             # Валидация URL
             if not self._is_valid_url(url):
-                logger.warning(f"Некорректный URL в строке {i+1}: {url}")
+                logger.warning(f"Некорректный URL в строке {i + 1}: {url}")
                 continue
 
             # Извлекаем идентификатор канала
@@ -78,7 +78,7 @@ class SheetsParser:
         try:
             result = urlparse(url)
             return all([result.scheme, result.netloc])
-        except:
+        except ValueError:
             return False
 
     def _extract_channel_id(self, url: str, source_type: str) -> str:
@@ -97,7 +97,7 @@ class SheetsParser:
                 # Пример: https://t.me/channelname
                 match = re.search(r"t\.me/(.+)", url)
                 if "c/" in match.group(1):
-                    return "-100"+match.group(1)[2:]
+                    return "-100" + match.group(1)[2:]
                 return str(match.group(1).strip("/")) if match else None
 
             elif source_type == "youtube":
@@ -137,7 +137,7 @@ class SheetsParser:
             logger.error(f"Ошибка при извлечении ID из {url}: {e}")
             return None
 
-    def get_all_channels(self) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_channels(self) -> dict[str, list[dict[str, Any]]]:
         """
         Получение всех каналов из всех листов
 
@@ -155,10 +155,7 @@ class SheetsParser:
 
         # Сразу отбираем только листы, которые есть в sheets_mapping
         expected_sheets = set(self.sheets_mapping.keys())
-        matching_sheets = {
-            name: data for name, data in sheets.items()
-            if name in expected_sheets
-        }
+        matching_sheets = {name: data for name, data in sheets.items() if name in expected_sheets}
 
         # Обрабатываем только отобранные листы
         for sheet_name in matching_sheets:

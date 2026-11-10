@@ -1,0 +1,90 @@
+[project]
+name = "news-digest-app-lite"
+version = "0.1.0"
+description = "Портативный агрегатор новостей (Twitter, Telegram, YouTube) с LLM-фильтрацией"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp==3.9.5",
+    "apscheduler==3.10.4",
+    "fastembed",
+    "flask==3.1.2",
+    "flask-cors==4.0.0",
+    "google-api-python-client==2.187.0",
+    "groq",
+    "hypercorn==0.18.0",
+    "instructor",
+    "langdetect==1.0.9",
+    "numpy",
+    "openai",
+    "pillow==12.1.0",
+    "praw==7.7.1",
+    "protobuf==6.33.4",
+    "pydantic",
+    "pystray==0.19.5",
+    "python-dotenv==1.2.1",
+    "pytz==2024.1",
+    "quart==0.20.0",
+    "quart-cors==0.8.0",
+    "requests==2.32.5",
+    "sqlalchemy==2.0.30",
+    "telethon==1.42.0",
+    "tweepy==4.14.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = [
+    ".venv",
+    "venv",
+    "python_dist",
+    "data",
+    ".idea",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "W",
+    "UP",
+    "G",
+    "DTZ",
+    "ASYNC",
+    "SIM",
+    "PLE",
+    "S",
+    "PYI",
+]
+ignore = [
+    "BLE001",
+    "PLW0602",
+    "G004",
+    "E501",
+    "DTZ003",
+    "DTZ005",
+    "DTZ007",
+    "E712",
+    "E402",
+    "S104",
+    "S310",
+    "S603",
+    "SIM117",
+    "SIM102",
+    "SIM108",
+    "SIM105",
+    "SIM300",
+    "ASYNC110",
+    "ASYNC240",
+]
+

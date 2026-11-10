@@ -2,18 +2,18 @@
 Промпты для LLM API.
 Загружаются из файла app/configs/prompts.json при инициализации.
 """
-import os
+
 import json
 import logging
-from typing import Dict, Optional
+import os
 
 logger = logging.getLogger(__name__)
 
 # Путь к файлу промптов
 PROMPTS_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    'configs',
-    'prompts.json'
+    "configs",
+    "prompts.json",
 )
 
 # Глобальные переменные для промптов
@@ -22,9 +22,10 @@ INTEREST_SCORING_PROMPT: str = ""
 DIGEST_PROCESSING_PROMPT: str = ""
 
 # Кэш загруженных промптов
-_prompts_cache: Dict[str, str] = {}
+_prompts_cache: dict[str, str] = {}
 
-def load_prompts() -> Dict[str, str]:
+
+def load_prompts() -> dict[str, str]:
     """
     Загрузка промптов из JSON файла.
 
@@ -37,19 +38,27 @@ def load_prompts() -> Dict[str, str]:
     prompts = {}
 
     if not os.path.exists(PROMPTS_FILE):
-        logger.warning(f"Файл промптов не найден: {PROMPTS_FILE}. Создаём с значениями по умолчанию...")
+        logger.warning(
+            f"Файл промптов не найден: {PROMPTS_FILE}. Создаём с значениями по умолчанию..."
+        )
         save_prompts(DEFAULT_PROMPTS.copy())
         prompts = DEFAULT_PROMPTS.copy()
     else:
         try:
-            with open(PROMPTS_FILE, 'r', encoding='utf-8') as f:
+            with open(PROMPTS_FILE, encoding="utf-8") as f:
                 prompts = json.load(f)
 
             # Проверяем наличие всех ключей
-            for key in ['AD_DETECTION_PROMPT', 'INTEREST_SCORING_PROMPT', 'DIGEST_PROCESSING_PROMPT']:
+            for key in [
+                "AD_DETECTION_PROMPT",
+                "INTEREST_SCORING_PROMPT",
+                "DIGEST_PROCESSING_PROMPT",
+            ]:
                 if key not in prompts:
                     prompts[key] = DEFAULT_PROMPTS.get(key, "")
-                    logger.warning(f"Ключ {key} не найден в файле, используется значение по умолчанию")
+                    logger.warning(
+                        f"Ключ {key} не найден в файле, используется значение по умолчанию"
+                    )
 
         except json.JSONDecodeError as e:
             logger.error(f"Ошибка парсинга JSON файла промптов: {e}")
@@ -59,9 +68,9 @@ def load_prompts() -> Dict[str, str]:
             prompts = DEFAULT_PROMPTS.copy()
 
     # Присваиваем глобальным переменным
-    AD_DETECTION_PROMPT = prompts.get('AD_DETECTION_PROMPT', '')
-    INTEREST_SCORING_PROMPT = prompts.get('INTEREST_SCORING_PROMPT', '')
-    DIGEST_PROCESSING_PROMPT = prompts.get('DIGEST_PROCESSING_PROMPT', '')
+    AD_DETECTION_PROMPT = prompts.get("AD_DETECTION_PROMPT", "")
+    INTEREST_SCORING_PROMPT = prompts.get("INTEREST_SCORING_PROMPT", "")
+    DIGEST_PROCESSING_PROMPT = prompts.get("DIGEST_PROCESSING_PROMPT", "")
 
     _prompts_cache = prompts
     logger.info(f"Загружено {len(prompts)} промптов из {PROMPTS_FILE}")
@@ -69,7 +78,7 @@ def load_prompts() -> Dict[str, str]:
     return prompts
 
 
-def save_prompts(prompts: Dict[str, str]) -> bool:
+def save_prompts(prompts: dict[str, str]) -> bool:
     """
     Сохранение промптов в JSON файл.
 
@@ -85,29 +94,33 @@ def save_prompts(prompts: Dict[str, str]) -> bool:
     existing_prompts = {}
     if os.path.exists(PROMPTS_FILE):
         try:
-            with open(PROMPTS_FILE, 'r', encoding='utf-8') as f:
+            with open(PROMPTS_FILE, encoding="utf-8") as f:
                 existing_prompts = json.load(f)
         except Exception as e:
             logger.warning(f"Не удалось прочитать существующий файл промптов: {e}")
             existing_prompts = DEFAULT_PROMPTS.copy()
 
     # Обновляем значения (только разрешённые ключи)
-    allowed_keys = ['AD_DETECTION_PROMPT', 'INTEREST_SCORING_PROMPT', 'DIGEST_PROCESSING_PROMPT']
+    allowed_keys = [
+        "AD_DETECTION_PROMPT",
+        "INTEREST_SCORING_PROMPT",
+        "DIGEST_PROCESSING_PROMPT",
+    ]
     for key, value in prompts.items():
         if key in allowed_keys:
             existing_prompts[key] = value
 
     # Сохраняем в JSON
     try:
-        with open(PROMPTS_FILE, 'w', encoding='utf-8') as f:
+        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
             json.dump(existing_prompts, f, ensure_ascii=False, indent=4)
 
         logger.info(f"Сохранено {len(prompts)} промптов в {PROMPTS_FILE}")
 
         # Немедленно обновляем глобальные переменные
-        AD_DETECTION_PROMPT = existing_prompts.get('AD_DETECTION_PROMPT', '')
-        INTEREST_SCORING_PROMPT = existing_prompts.get('INTEREST_SCORING_PROMPT', '')
-        DIGEST_PROCESSING_PROMPT = existing_prompts.get('DIGEST_PROCESSING_PROMPT', '')
+        AD_DETECTION_PROMPT = existing_prompts.get("AD_DETECTION_PROMPT", "")
+        INTEREST_SCORING_PROMPT = existing_prompts.get("INTEREST_SCORING_PROMPT", "")
+        DIGEST_PROCESSING_PROMPT = existing_prompts.get("DIGEST_PROCESSING_PROMPT", "")
 
         # Обновляем кэш
         _prompts_cache = existing_prompts
@@ -131,7 +144,11 @@ def update_prompt(key: str, value: str) -> bool:
     """
     global AD_DETECTION_PROMPT, INTEREST_SCORING_PROMPT, DIGEST_PROCESSING_PROMPT
 
-    if key not in ['AD_DETECTION_PROMPT', 'INTEREST_SCORING_PROMPT', 'DIGEST_PROCESSING_PROMPT']:
+    if key not in [
+        "AD_DETECTION_PROMPT",
+        "INTEREST_SCORING_PROMPT",
+        "DIGEST_PROCESSING_PROMPT",
+    ]:
         logger.error(f"Недопустимый ключ промпта: {key}")
         return False
 
@@ -148,7 +165,8 @@ def update_prompt(key: str, value: str) -> bool:
 
     return result
 
-def get_prompt(key: str) -> Optional[str]:
+
+def get_prompt(key: str) -> str | None:
     """
     Получение конкретного промпта.
 
@@ -167,7 +185,7 @@ def get_prompt(key: str) -> Optional[str]:
     return _prompts_cache.get(key)
 
 
-def get_all_prompts() -> Dict[str, str]:
+def get_all_prompts() -> dict[str, str]:
     """
     Получение всех промптов.
 
@@ -195,6 +213,7 @@ def reset_prompts_to_default() -> bool:
 # Автоматическая загрузка при импорте модуля
 _initialized = False
 
+
 def initialize():
     """
     Инициализация промптов.
@@ -205,10 +224,10 @@ def initialize():
         load_prompts()
         _initialized = True
 
+
 # Значения по умолчанию для промптов - С АНГЛИЙСКИМИ ИНСТРУКЦИЯМИ
 DEFAULT_PROMPTS = {
-    "AD_DETECTION_PROMPT":
-        """Ты - модератор технических новостных каналов. Определи, является ли следующий текст коммерческой рекламой.
+    "AD_DETECTION_PROMPT": """Ты - модератор технических новостных каналов. Определи, является ли следующий текст коммерческой рекламой.
 
 Ты анализируешь контент из источников: Telegram каналы, YouTube каналы, Twitter/X разработчиков.
 
@@ -277,11 +296,8 @@ DEFAULT_PROMPTS = {
 3. Не добавляй никаких пояснений, только JSON массив.
 4. Не используй блоки кода ```json или ```
 5. Не добавляй никакого текста кроме JSON
-"""
-,
-
-    "INTEREST_SCORING_PROMPT":
-        """Ты - эксперт по оценке новостей в теме: {topic}.
+""",
+    "INTEREST_SCORING_PROMPT": """Ты - эксперт по оценке новостей в теме: {topic}.
 Оцени полезность каждой новости относительно данной тематики по шкале от 0.000 до 0.999.
 
 Шкала оценок:
@@ -307,9 +323,7 @@ DEFAULT_PROMPTS = {
 4. Не используй блоки кода ```json или ```
 5. Не добавляй никакого текста кроме JSON
 """,
-
-    "DIGEST_PROCESSING_PROMPT":
-        """Ты - профессиональный редактор дайджестов. Обработай следующие новости:
+    "DIGEST_PROCESSING_PROMPT": """Ты - профессиональный редактор дайджестов. Обработай следующие новости:
 1. Переведи весь текст новостей и заголовки новостей на русский язык. Английских новостей быть не должно
 2. Убери дублирующие новости
 3. Суммаризируй каждую новость до 3-5 предложений. Если нет текста у новости, сгенерируй в таком-же объеме на основе заголовка.
@@ -360,7 +374,7 @@ Nvidia разработала решение для проблемы KV-кэша
    - ЗАПРЕЩЕНЫ реальные переносы строк. Вместо них используй литерал \\n.
    - ЗАПРЕЩЕНЫ реальные символы табуляции.
 3. Telegram HTML:
-   - Разрешены ТОЛЬКО теги: 
+   - Разрешены ТОЛЬКО теги:
      <b>жирный</b>
      <i>Курсив</i>
      <code>код</code>
@@ -372,7 +386,7 @@ Nvidia разработала решение для проблемы KV-кэша
    - Используй ОДИНАРНЫЕ кавычки для HTML-атрибутов внутри текста, например: <a href='url'>. Это предотвратит конфликт с двойными кавычками JSON.
 4. Валидация: Ответ будет обработан функцией json.loads(). Любая ошибка синтаксиса сделает ответ бесполезным. Если возникнет ошибка JSONDecodeError, задача считается проваленной.
 
-Верни ответ ТОЛЬКО в формате JSON: {{"digest_text": "полный текст дайджеста в Telegram HTML"}}"""
+Верни ответ ТОЛЬКО в формате JSON: {{"digest_text": "полный текст дайджеста в Telegram HTML"}}""",
 }
 
 # Вызываем инициализацию при импорте

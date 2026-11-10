@@ -5,8 +5,9 @@
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any
 
+from app.configs import config
 from app.scheduler.base_scheduler import BaseScheduler
 
 logger = logging.getLogger(__name__)
@@ -22,12 +23,7 @@ class SinglePassScheduler(BaseScheduler):
     - Автоматически публикует daily дайджест после завершения
     """
 
-    def __init__(
-        self,
-        parser_manager,
-        sync_manager,
-        digest_publisher: Optional[Any] = None
-    ):
+    def __init__(self, parser_manager, sync_manager, digest_publisher: Any | None = None):
         """
         Инициализация планировщика единичного прохода.
 
@@ -40,7 +36,7 @@ class SinglePassScheduler(BaseScheduler):
             sync_manager,
             scheduler_type="single_pass",
             cycle=False,
-            digest_publisher=digest_publisher
+            digest_publisher=digest_publisher,
         )
 
     async def _on_all_sources_finished(self):
@@ -49,7 +45,13 @@ class SinglePassScheduler(BaseScheduler):
         """
         logger.info("📝 Публикация дайджеста после завершения сбора...")
 
-        # Публикуем daily дайджест через digest_publisher
-        await self._execute_digest_with_retry(digest_type='daily')
+        count = max(1, config.app.once_digest_count)
+        if self.digest_publisher and hasattr(self.digest_publisher, "execute_digest_batch"):
+            await self.digest_publisher.execute_digest_batch("daily", count)
+        else:
+            await self._execute_digest_with_retry(digest_type="daily")
 
-        logger.info("📋 Все источники обработаны, дайджест опубликован")
+        logger.info(
+            "Все источники обработаны, опубликовано до %s daily-дайджест(ов)",
+            count,
+        )

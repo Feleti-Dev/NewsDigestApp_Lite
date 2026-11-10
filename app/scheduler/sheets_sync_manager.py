@@ -5,7 +5,6 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, List
 
 from app.google_sheets.parser import SheetsParser
 
@@ -34,6 +33,7 @@ class SheetsSyncManager:
         """Ленивое получение DatabaseManager"""
         if self._db_manager is None:
             from app.database.db_utils import DatabaseManager
+
             self._db_manager = DatabaseManager()
         return self._db_manager
 
@@ -58,7 +58,7 @@ class SheetsSyncManager:
         time_since_sync = datetime.now() - self.last_sync_time
         return time_since_sync.total_seconds() >= 24 * 3600
 
-    def sync_channels(self, force: bool = False) -> Dict[str, List]:
+    def sync_channels(self, force: bool = False) -> dict[str, list]:
         """
         Синхронизация каналов с Google Sheets.
 
@@ -95,7 +95,7 @@ class SheetsSyncManager:
             logger.error(f"❌ Ошибка синхронизации: {e}")
             return self._load_from_db()
 
-    def _load_from_db(self) -> Dict[str, List]:
+    def _load_from_db(self) -> dict[str, list]:
         """
         Загрузка каналов из БД.
 

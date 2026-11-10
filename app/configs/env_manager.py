@@ -2,10 +2,11 @@
 Менеджер для работы с .env файлом.
 Позволяет сохранять конфигурацию с сохранением комментариев и структуры.
 """
+
 import json
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class EnvManager:
         self.env_path = env_path
         self._structure = None
 
-    def _load_structure(self) -> Dict[int, Dict[str, Any]]:
+    def _load_structure(self) -> dict[int, dict[str, Any]]:
         """
         Загрузка структуры .env файла.
 
@@ -43,26 +44,22 @@ class EnvManager:
 
         structure = {}
 
-        with open(self.env_path, 'r', encoding='utf-8') as f:
+        with open(self.env_path, encoding="utf-8") as f:
             for i, line in enumerate(f, 1):
                 stripped = line.strip()
 
-                line_info = {
-                    'original': line,
-                    'content': stripped,
-                    'type': 'empty'
-                }
+                line_info = {"original": line, "content": stripped, "type": "empty"}
 
                 if not stripped:
-                    line_info['type'] = 'empty'
-                elif stripped.startswith('#'):
-                    line_info['type'] = 'comment'
-                elif '=' in stripped:
-                    parts = stripped.split('=', 1)
+                    line_info["type"] = "empty"
+                elif stripped.startswith("#"):
+                    line_info["type"] = "comment"
+                elif "=" in stripped:
+                    parts = stripped.split("=", 1)
                     key = parts[0].strip()
-                    line_info['type'] = 'key_value'
-                    line_info['key'] = key
-                    line_info['value'] = parts[1].strip() if len(parts) > 1 else ''
+                    line_info["type"] = "key_value"
+                    line_info["key"] = key
+                    line_info["value"] = parts[1].strip() if len(parts) > 1 else ""
 
                 structure[i] = line_info
 
@@ -83,9 +80,9 @@ class EnvManager:
         if self._structure is None:
             self._load_structure()
 
-        for line_num, line_info in self._structure.items():
-            if line_info.get('key') == key:
-                return self._parse_value(line_info.get('value', ''))
+        for line_info in self._structure.values():
+            if line_info.get("key") == key:
+                return self._parse_value(line_info.get("value", ""))
 
         return default
 
@@ -103,15 +100,15 @@ class EnvManager:
             return None
 
         # Boolean
-        if value.upper() == 'TRUE':
+        if value.upper() == "TRUE":
             return True
-        if value.upper() == 'FALSE':
+        if value.upper() == "FALSE":
             return False
-        if value.upper() == 'NONE':
+        if value.upper() == "NONE":
             return None
 
         # JSON object/array
-        if value.startswith('{') or value.startswith('['):
+        if value.startswith(("{", "[")):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
@@ -119,7 +116,7 @@ class EnvManager:
 
         # Number
         try:
-            if '.' in value:
+            if "." in value:
                 return float(value)
             return int(value)
         except ValueError:
@@ -139,10 +136,10 @@ class EnvManager:
             Строковое представление
         """
         if value is None:
-            return ''
+            return ""
 
         if isinstance(value, bool):
-            return 'TRUE' if value else 'FALSE'
+            return "TRUE" if value else "FALSE"
 
         if isinstance(value, dict):
             return json.dumps(value, ensure_ascii=False)
@@ -154,9 +151,9 @@ class EnvManager:
             return str(value)
 
         # String - экранируем спецсимволы
-        return str(value).replace('"', '\"')
+        return str(value).replace('"', '"')
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """
         Получение всех переменных из .env.
 
@@ -168,14 +165,14 @@ class EnvManager:
 
         result = {}
         for line_info in self._structure.values():
-            if line_info.get('type') == 'key_value':
-                key = line_info.get('key')
-                value = line_info.get('value', '')
+            if line_info.get("type") == "key_value":
+                key = line_info.get("key")
+                value = line_info.get("value", "")
                 result[key] = self._parse_value(value)
 
         return result
 
-    def save(self, updates: Dict[str, Any]) -> bool:
+    def save(self, updates: dict[str, Any]) -> bool:
         """
         Сохранение конфигурации в .env файл.
         Обновляет существующие значения, сохраняя комментарии.
@@ -191,7 +188,7 @@ class EnvManager:
 
         if not self._structure:
             logger.warning("Структура .env пуста, создаём новую")
-            self._structure = {1: {'type': 'empty', 'content': '', 'original': ''}}
+            self._structure = {1: {"type": "empty", "content": "", "original": ""}}
 
         # Обновляем существующие значения
         updated_keys = set()
@@ -199,15 +196,15 @@ class EnvManager:
         for line_num in sorted(self._structure.keys()):
             line_info = self._structure[line_num]
 
-            if line_info.get('type') != 'key_value':
+            if line_info.get("type") != "key_value":
                 continue
 
-            key = line_info.get('key')
+            key = line_info.get("key")
             if key in updates:
                 new_value = self._format_value(updates[key])
-                line_info['content'] = f'{key}={new_value}'
-                line_info['original'] = f'{line_info["content"]}\n'
-                line_info['value'] = new_value
+                line_info["content"] = f"{key}={new_value}"
+                line_info["original"] = f"{line_info['content']}\n"
+                line_info["value"] = new_value
                 updated_keys.add(key)
 
         # Добавляем новые параметры (в конец файла)
@@ -215,25 +212,25 @@ class EnvManager:
         for key, value in updates.items():
             if key not in updated_keys:
                 formatted_value = self._format_value(value)
-                new_line = f'\n# Добавлено через веб-интерфейс\n{key}={formatted_value}\n'
+                new_line = f"\n# Добавлено через веб-интерфейс\n{key}={formatted_value}\n"
                 new_params.append(new_line)
 
         if new_params:
             # Добавляем пустую строку перед новыми параметрами
             last_line_num = max(self._structure.keys())
             self._structure[last_line_num + 1] = {
-                'type': 'empty',
-                'content': '',
-                'original': '\n'
+                "type": "empty",
+                "content": "",
+                "original": "\n",
             }
             for i, param in enumerate(new_params):
                 line_num = last_line_num + 2 + i
                 self._structure[line_num] = {
-                    'type': 'key_value',
-                    'key': param.split('=')[1].split('\n')[0] if '=' in param else '',
-                    'content': param.strip(),
-                    'original': param,
-                    'value': param.split('=', 1)[1].strip() if '=' in param else ''
+                    "type": "key_value",
+                    "key": param.split("=")[1].split("\n")[0] if "=" in param else "",
+                    "content": param.strip(),
+                    "original": param,
+                    "value": param.split("=", 1)[1].strip() if "=" in param else "",
                 }
 
         # Записываем файл
@@ -249,9 +246,9 @@ class EnvManager:
         try:
             lines = []
             for line_num in sorted(self._structure.keys()):
-                lines.append(self._structure[line_num]['original'])
+                lines.append(self._structure[line_num]["original"])
 
-            with open(self.env_path, 'w', encoding='utf-8') as f:
+            with open(self.env_path, "w", encoding="utf-8") as f:
                 f.writelines(lines)
 
             logger.info(f"Конфигурация сохранена в {self.env_path}")
@@ -261,7 +258,7 @@ class EnvManager:
             logger.error(f"Ошибка записи .env файла: {e}")
             return False
 
-    def update_from_dict(self, config_dict: Dict[str, Any]) -> bool:
+    def update_from_dict(self, config_dict: dict[str, Any]) -> bool:
         """
         Обновление конфигурации из словаря с вложенной структурой.
 
@@ -274,7 +271,7 @@ class EnvManager:
         flat_updates = self._flatten_dict(config_dict)
         return self.save(flat_updates)
 
-    def _flatten_dict(self, nested: Dict[str, Any], prefix: str = '') -> Dict[str, Any]:
+    def _flatten_dict(self, nested: dict[str, Any], prefix: str = "") -> dict[str, Any]:
         """
         Преобразование вложенного словаря в плоский.
 
@@ -297,7 +294,7 @@ class EnvManager:
 
         return result
 
-    def get_section(self, section_name: str) -> Dict[str, Any]:
+    def get_section(self, section_name: str) -> dict[str, Any]:
         """
         Получение секции конфигурации.
 
@@ -313,12 +310,12 @@ class EnvManager:
         section = {}
         for key, value in all_values.items():
             if key.startswith(prefix):
-                new_key = key[len(prefix):].lower()
+                new_key = key[len(prefix) :].lower()
                 section[new_key] = value
 
         return section
 
-    def save_and_update_config(self, section: str, updates: Dict[str, Any], config) -> bool:
+    def save_and_update_config(self, section: str, updates: dict[str, Any], config) -> bool:
         """
         Сохранение конфигурации в .env и обновление глобального объекта config.
 
@@ -345,6 +342,7 @@ class EnvManager:
         config.update_config(section, lowercase_updates)
 
         return True
+
 
 # Функция для быстрого доступа к конфигурации
 def get_env_manager() -> EnvManager:

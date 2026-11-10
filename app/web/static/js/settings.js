@@ -41,7 +41,12 @@ function loadGeneralSettings() {
             $('#topic').val(c.topic || '');
             $('#max_news_per_channel').val(c.max_news_per_channel || 5);
             $('#max_news_per_digest').val(c.max_news_per_digest || 7);
-            $('#max_news_time_period').val(c.max_news_time_period || 86400);
+            $('#max_news_time_period').val(c.max_news_time_period || 24);
+            $('#once_digest_count').val(c.once_digest_count || 1);
+            $('#dedup_enabled').prop('checked', c.dedup_enabled !== false);
+            $('#dedup_similarity_threshold').val(c.dedup_similarity_threshold ?? 0.86);
+            $('#dedup_lookback_hours').val(c.dedup_lookback_hours ?? 0);
+            $('#dedup_embedding_model').val(c.dedup_embedding_model || 'intfloat/multilingual-e5-small');
         }
     }).fail(function(xhr) { showToast(xhr.responseJSON?.message || 'Ошибка', 'error'); });
 }
@@ -55,7 +60,12 @@ function saveGeneralSettings(e) {
         TOPIC: $('#topic').val(),
         MAX_NEWS_PER_CHANNEL: parseInt($('#max_news_per_channel').val()),
         MAX_NEWS_PER_DIGEST: parseInt($('#max_news_per_digest').val()),
-        MAX_NEWS_TIME_PERIOD: parseInt($('#max_news_time_period').val())
+        MAX_NEWS_TIME_PERIOD: parseInt($('#max_news_time_period').val()),
+        ONCE_DIGEST_COUNT: parseInt($('#once_digest_count').val()),
+        DEDUP_ENABLED: $('#dedup_enabled').is(':checked') ? 'TRUE' : 'FALSE',
+        DEDUP_SIMILARITY_THRESHOLD: parseFloat($('#dedup_similarity_threshold').val()),
+        DEDUP_LOOKBACK_HOURS: parseInt($('#dedup_lookback_hours').val(), 10) || 0,
+        DEDUP_EMBEDDING_MODEL: $('#dedup_embedding_model').val()
     }}, 'Основные настройки сохранены', loadGeneralSettings);
 }
 
@@ -74,6 +84,7 @@ function loadApiSettings() {
             $('#twitter_bearer_token').val(a.twitter_bearer_token || '');
             $('#youtube_api_key').val(a.youtube_api_key || '');
             $('#groq_api_key').val(a.groq_api_key || '');
+            $('#llm_api_base_url').val(a.llm_api_base_url || 'https://api.groq.com/openai/v1');
         }
     }).fail(function(xhr) { showToast(xhr.responseJSON?.message || 'Ошибка', 'error'); });
 }
@@ -90,6 +101,7 @@ function saveApiSettings(e) {
         TWITTER_BEARER_TOKEN: $('#twitter_bearer_token').val(),
         YOUTUBE_API_KEY: $('#youtube_api_key').val(),
         GROQ_API_KEY: $('#groq_api_key').val(),
+        LLM_API_BASE_URL: $('#llm_api_base_url').val(),
         GOOGLE_SPREADSHEET_ID: $('#google_spreadsheet_id').val()
     }}, 'API настройки сохранены', loadApiSettings);
 }

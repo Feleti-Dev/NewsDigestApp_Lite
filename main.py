@@ -8,7 +8,10 @@
 Или с Hypercorn:
     hypercorn main:app --bind 0.0.0.0:5000 --reload
 """
-import os, sys
+
+import os
+import sys
+
 # Получаем абсолютный путь к папке, где лежит main.py
 project_root = os.path.dirname(os.path.abspath(__file__))
 
@@ -39,12 +42,13 @@ from app.scheduler.scheduler_manager import SchedulerManager
 # logger = logging.getLogger(__name__)
 logger = setup_logging()
 # Отключаем избыточное логирование от библиотек
-#logging.getLogger("hypercorn").setLevel(logging.WARNING)
-#logging.getLogger("hypercorn.access").setLevel(logging.WARNING)
-#logging.getLogger("hypercorn.error").setLevel(logging.WARNING)
+# logging.getLogger("hypercorn").setLevel(logging.WARNING)
+# logging.getLogger("hypercorn.access").setLevel(logging.WARNING)
+# logging.getLogger("hypercorn.error").setLevel(logging.WARNING)
 # logging.getLogger("telethon").setLevel(logging.WARNING)
 # logging.getLogger("googleapiclient").setLevel(logging.WARNING)
 # ===========================================
+
 
 def create_app() -> Quart:
     """
@@ -56,14 +60,15 @@ def create_app() -> Quart:
     app = Quart(__name__)
 
     # Конфигурация
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
-    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
 
     # Включаем CORS для API
     cors(app)
 
     # Регистрация blueprints
     from app.web.routes import bp
+
     app.register_blueprint(bp)
 
     # Логируем успешную инициализацию
@@ -80,6 +85,7 @@ scheduler_manager: SchedulerManager | None = None
 restart_manager = None
 app = create_app()
 
+
 async def initialize_managers(app: Quart):
     """
     Инициализация глобальных менеджеров приложения.
@@ -93,36 +99,38 @@ async def initialize_managers(app: Quart):
 
     # Инициализация DatabaseManager
     from app.database.db_utils import DatabaseManager
+
     db_manager = DatabaseManager()
     logger.info("✅ DatabaseManager инициализирован")
 
     # Инициализация ParserManager
     from app.parsers.parser_manager import ParserManager
+
     parser_manager = ParserManager(db_manager)
     logger.info("✅ ParserManager инициализирован")
 
     # Инициализация SchedulerManager
     from app.scheduler.scheduler_manager import SchedulerManager
+
     scheduler_manager = SchedulerManager()
 
     # Определяем режим работы из конфигурации
     from app.configs import config
-    bypassing_method = getattr(config.app, 'bypassing_method', 'NONE')
 
-    scheduler_manager.initialize(
-        parser_manager=parser_manager,
-        bypassing_method=bypassing_method
-    )
+    bypassing_method = getattr(config.app, "bypassing_method", "NONE")
+
+    scheduler_manager.initialize(parser_manager=parser_manager, bypassing_method=bypassing_method)
     await scheduler_manager.start_all()
     logger.info(f"✅ SchedulerManager инициализирован (режим: {bypassing_method})")
 
     # Установка менеджеров в routes
     from app.web.routes import set_managers
+
     set_managers(
         out_parser_manager=parser_manager,
         out_db_manager=db_manager,
         out_digest_scheduler=scheduler_manager.digest_scheduler,
-        out_scheduler_manager=scheduler_manager
+        out_scheduler_manager=scheduler_manager,
     )
 
     logger.info("✅ Все менеджеры инициализированы")
@@ -137,10 +145,11 @@ async def before_serving():
 
     # Создаём парсеры при старте
     if parser_manager:
-       parser_manager.create_parsers()
-       logger.info("✅ Парсеры созданы")
+        parser_manager.create_parsers()
+        logger.info("✅ Парсеры созданы")
 
     logger.info("✅ Приложение готово к работе")
+
 
 @app.after_serving
 async def after_serving():
@@ -160,7 +169,7 @@ async def after_serving():
     logger.info("✅ Приложение остановлено")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Запуск приложения через Hypercorn (ASGI сервер).
 
@@ -168,17 +177,17 @@ if __name__ == '__main__':
     для асинхронных фреймворков и поддерживает HTTP/2 и WebSocket.
     """
 
-    from hypercorn.config import Config
     from hypercorn.asyncio import serve
+    from hypercorn.config import Config
 
-    template_folder = Path(__file__).parent / 'app' / 'web' / 'templates'
+    template_folder = Path(__file__).parent / "app" / "web" / "templates"
     app.template_folder = str(template_folder)
-    app.static_folder = str(Path(__file__).parent / 'app' / 'web' / 'static')
+    app.static_folder = str(Path(__file__).parent / "app" / "web" / "static")
 
     config = Config()
     config.bind = ["127.0.0.1:5000"]
     config.use_reloader = True  # Автоперезагрузка при изменении кода
-    config.loglevel = "DEBUG" # Логи доступа в stdout
+    config.loglevel = "DEBUG"  # Логи доступа в stdout
 
     # Запуск с помощью hypercorn
     logger.info("🚀 Запуск Quart приложения с Hypercorn...")

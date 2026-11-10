@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from .base_parser import BaseParser
 
@@ -39,9 +39,7 @@ class YouTubeParser(BaseParser):
             logger.error(f"Ошибка инициализации YouTube API: {e}")
             self.youtube = None
 
-    async def fetch_channel_news(
-        self, channel_url: str, channel_id: str
-    ) -> List[Dict[str, Any]]:
+    async def fetch_channel_news(self, channel_url: str, channel_id: str) -> list[dict[str, Any]]:
         """
         Получение видео с канала YouTube с оптимизацией квоты
         """
@@ -50,20 +48,27 @@ class YouTubeParser(BaseParser):
             return []
         try:
             from googleapiclient.errors import HttpError
+
             try:
                 # Используем дешевый метод channels.list вместо search
-                channels_response = self.youtube.channels().list(
-                    part="contentDetails,id",
-                    # id=channel_id if not channel_id.startswith('@') else None,
-                    forHandle=channel_id,
-                    fields="items(contentDetails/relatedPlaylists/uploads)"
-                ).execute()
+                channels_response = (
+                    self.youtube.channels()
+                    .list(
+                        part="contentDetails,id",
+                        # id=channel_id if not channel_id.startswith('@') else None,
+                        forHandle=channel_id,
+                        fields="items(contentDetails/relatedPlaylists/uploads)",
+                    )
+                    .execute()
+                )
 
                 if not channels_response.get("items"):
                     logger.warning(f"Канал {channel_id} не найден")
                     return []
 
-                uploads_playlist_id = channels_response["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+                uploads_playlist_id = channels_response["items"][0]["contentDetails"][
+                    "relatedPlaylists"
+                ]["uploads"]
 
             except HttpError as e:
                 logger.error(f"Ошибка получения playlist_id для {channel_id}: {e}")
@@ -71,12 +76,16 @@ class YouTubeParser(BaseParser):
 
             # 3. ПОЛУЧАЕМ ВИДЕО ЧЕРЕЗ PLAYLISTITEMS.LIST (1 единица)
             try:
-                playlist_response = self.youtube.playlistItems().list(
-                    part="snippet,contentDetails",
-                    playlistId=uploads_playlist_id,
-                    maxResults=5,
-                    fields="items(snippet(publishedAt,title,description,channelTitle,thumbnails),contentDetails/videoId)"
-                ).execute()
+                playlist_response = (
+                    self.youtube.playlistItems()
+                    .list(
+                        part="snippet,contentDetails",
+                        playlistId=uploads_playlist_id,
+                        maxResults=5,
+                        fields="items(snippet(publishedAt,title,description,channelTitle,thumbnails),contentDetails/videoId)",
+                    )
+                    .execute()
+                )
 
                 if not playlist_response.get("items"):
                     logger.info(f"Нет видео в плейлисте загрузок {channel_id}")
@@ -86,10 +95,12 @@ class YouTubeParser(BaseParser):
                 videos = []
                 video_ids = []
                 for item in playlist_response["items"]:
-                    videos.append({
-                        "id": item["contentDetails"]["videoId"],
-                        "snippet": item["snippet"]
-                    })
+                    videos.append(
+                        {
+                            "id": item["contentDetails"]["videoId"],
+                            "snippet": item["snippet"],
+                        }
+                    )
                     video_ids.append(item["contentDetails"]["videoId"])
                 return videos
 
@@ -101,7 +112,7 @@ class YouTubeParser(BaseParser):
             logger.error(f"Общая ошибка для канала {channel_id}: {e}")
             return []
 
-    def extract_news_data(self, raw_data: Any) -> Dict[str, Any]:
+    def extract_news_data(self, raw_data: Any) -> dict[str, Any]:
         """
         Извлечение данных из видео YouTube
 
@@ -119,9 +130,7 @@ class YouTubeParser(BaseParser):
                 "url": f"https://www.youtube.com/watch?v={video['id']}",
                 "title": snippet.get("title", ""),
                 "text": snippet.get("description", ""),
-                "publication_date": datetime.strptime(
-                    snippet["publishedAt"], "%Y-%m-%dT%H:%M:%SZ"
-                ),
+                "publication_date": datetime.strptime(snippet["publishedAt"], "%Y-%m-%dT%H:%M:%SZ"),
                 "has_image": True,
                 "image_url": snippet.get("thumbnails", {}).get("high", {}).get("url"),
                 "note": f"YouTube video; channel={snippet.get('channelTitle', '')}",

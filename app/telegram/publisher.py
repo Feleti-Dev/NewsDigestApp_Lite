@@ -3,9 +3,11 @@
 Публикация дайджестов в Telegram канал
 Используем HTML разметку вместо Markdown
 """
-import logging
+
 import asyncio
-from typing import Dict, Any
+import logging
+from typing import Any
+
 import aiohttp
 
 from app.configs import config
@@ -30,7 +32,9 @@ class TelegramPublisher:
             self.channel_id = cid if cid.startswith("-") else f"-100{cid}"
             self.thread_id = int(tid)
         else:
-            self.channel_id = self.channel_id if self.channel_id.startswith("-") else f"-100{self.channel_id}"
+            self.channel_id = (
+                self.channel_id if self.channel_id.startswith("-") else f"-100{self.channel_id}"
+            )
             self.thread_id = None
 
         # Настройки повторных попыток
@@ -51,9 +55,10 @@ class TelegramPublisher:
             raise ValueError("TELEGRAM_CHANNEL_ID не указан")
 
         logger.info(
-            f"✅ Конфигурация Telegram: бот токен {'установлен' if self.bot_token else 'отсутствует'}, канал: {self.channel_id}")
+            f"✅ Конфигурация Telegram: бот токен {'установлен' if self.bot_token else 'отсутствует'}, канал: {self.channel_id}"
+        )
 
-    async def publish_digest(self, digest_data: Dict[str, Any], type: str = "HTML") -> bool:
+    async def publish_digest(self, digest_data: dict[str, Any], type: str = "HTML") -> bool:
         """
         Публикация дайджеста в Telegram канал
 
@@ -67,10 +72,10 @@ class TelegramPublisher:
 
         try:
             # Сначала отправляем полный текст
-            text_sent = await self._send_text_only(digest_data['text'], type)
+            text_sent = await self._send_text_only(digest_data["text"], type)
 
             if not text_sent:
-                logger.error(f"❌ Не удалось отправить текст дайджеста")
+                logger.error("❌ Не удалось отправить текст дайджеста")
                 return False
 
             # Затем отправляем изображение (если есть)
@@ -84,10 +89,12 @@ class TelegramPublisher:
             #     )
 
             if text_sent:
-                logger.info(f"✅ {digest_data['type'].capitalize()} дайджест опубликован в Telegram")
+                logger.info(
+                    f"✅ {digest_data['type'].capitalize()} дайджест опубликован в Telegram"
+                )
                 return True
             else:
-                logger.warning(f"⚠️  Дайджест опубликован, но изображение не отправлено")
+                logger.warning("⚠️  Дайджест опубликован, но изображение не отправлено")
                 return True  # Все равно считаем успехом, т.к. текст отправлен
 
         except Exception as e:
@@ -119,15 +126,17 @@ class TelegramPublisher:
 
                 # Параметры запроса
                 params = {
-                    'chat_id': self.channel_id,
-                    'photo': image_url,
-                    'caption': caption[:1024] if len(caption) > 1024 else caption,  # Ограничение Telegram
-                    'parse_mode': 'HTML',
-                    'disable_web_page_preview': 'false'
+                    "chat_id": self.channel_id,
+                    "photo": image_url,
+                    "caption": caption[:1024]
+                    if len(caption) > 1024
+                    else caption,  # Ограничение Telegram
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": "false",
                 }
                 # ДОБАВЬТЕ ЭТО:
                 if self.thread_id:
-                    params['message_thread_id'] = self.thread_id
+                    params["message_thread_id"] = self.thread_id
 
                 # Отправляем запрос
                 async with aiohttp.ClientSession() as session:
@@ -138,14 +147,18 @@ class TelegramPublisher:
                             logger.info("✅ Изображение отправлено успешно")
                             return True
                         else:
-                            logger.error(f"❌ Ошибка API Telegram: {response.status} - {response_text}")
+                            logger.error(
+                                f"❌ Ошибка API Telegram: {response.status} - {response_text}"
+                            )
 
                             # Пробуем отправить без разметки
                             if "can't parse entities" in response_text.lower():
                                 logger.warning("⚠️  Проблема с HTML, пробуем без разметки")
-                                params['parse_mode'] = "HTML"
+                                params["parse_mode"] = "HTML"
 
-                                async with session.post(url, params=params, timeout=30) as retry_response:
+                                async with session.post(
+                                    url, params=params, timeout=30
+                                ) as retry_response:
                                     if retry_response.status == 200:
                                         logger.info("✅ Изображение отправлено без разметки")
                                         return True
@@ -170,7 +183,7 @@ class TelegramPublisher:
 
         return False
 
-    async def _send_with_image(self, digest_data: Dict[str, Any]) -> bool:
+    async def _send_with_image(self, digest_data: dict[str, Any]) -> bool:
         """
         Отправка дайджеста с изображением
 
@@ -180,8 +193,8 @@ class TelegramPublisher:
         Returns:
             True если отправка успешна
         """
-        image_url = digest_data['image_url']
-        text = digest_data['text']
+        image_url = digest_data["image_url"]
+        text = digest_data["text"]
 
         # Подготавливаем подпись для изображения
         caption = self._prepare_image_caption(text)
@@ -192,7 +205,7 @@ class TelegramPublisher:
             return False
 
         # Пробуем отправить с HTML разметкой
-        parse_mode = 'HTML'
+        parse_mode = "HTML"
 
         for attempt in range(self.max_retries):
             try:
@@ -203,11 +216,13 @@ class TelegramPublisher:
 
                 # Параметры запроса с HTML
                 params = {
-                    'chat_id': self.channel_id,
-                    'photo': image_url,
-                    'caption': caption[:1024] if len(caption) > 1024 else caption,  # Ограничение Telegram для подписи
-                    'parse_mode': parse_mode,
-                    'disable_web_page_preview': 'false'
+                    "chat_id": self.channel_id,
+                    "photo": image_url,
+                    "caption": caption[:1024]
+                    if len(caption) > 1024
+                    else caption,  # Ограничение Telegram для подписи
+                    "parse_mode": parse_mode,
+                    "disable_web_page_preview": "false",
                 }
 
                 # Отправляем запрос
@@ -216,17 +231,24 @@ class TelegramPublisher:
                         response_text = await response.text()
 
                         if response.status == 200:
-                            logger.info(f"✅ Изображение отправлено успешно (HTML)")
+                            logger.info("✅ Изображение отправлено успешно (HTML)")
                             return True
                         else:
-                            logger.error(f"❌ Ошибка API Telegram: {response.status} - {response_text}")
+                            logger.error(
+                                f"❌ Ошибка API Telegram: {response.status} - {response_text}"
+                            )
 
                             # Пробуем отправить без разметки
-                            if "can't parse entities" in response_text.lower() or "bad request" in response_text.lower():
+                            if (
+                                "can't parse entities" in response_text.lower()
+                                or "bad request" in response_text.lower()
+                            ):
                                 logger.warning("⚠️  Проблема с HTML, пробуем без разметки")
-                                params['parse_mode'] = "HTML"
+                                params["parse_mode"] = "HTML"
 
-                                async with session.post(url, params=params, timeout=30) as retry_response:
+                                async with session.post(
+                                    url, params=params, timeout=30
+                                ) as retry_response:
                                     if retry_response.status == 200:
                                         logger.info("✅ Изображение отправлено без разметки")
                                         return True
@@ -251,7 +273,7 @@ class TelegramPublisher:
 
         return False
 
-    async def _send_text_only(self, text: str, type: str="HTML") -> bool:
+    async def _send_text_only(self, text: str, type: str = "HTML") -> bool:
         """
         Отправка только текста дайджеста
 
@@ -277,14 +299,14 @@ class TelegramPublisher:
 
                 # Параметры запроса
                 params = {
-                    'chat_id': str(self.channel_id),
-                    'text': str(text),
-                    'parse_mode': parse_mode,
-                    'disable_web_page_preview': 'false'
+                    "chat_id": str(self.channel_id),
+                    "text": str(text),
+                    "parse_mode": parse_mode,
+                    "disable_web_page_preview": "false",
                 }
                 # ДОБАВЬТЕ ЭТО:
                 if self.thread_id:
-                    params['message_thread_id'] = self.thread_id
+                    params["message_thread_id"] = self.thread_id
 
                 # Отправляем запрос
                 async with aiohttp.ClientSession() as session:
@@ -295,15 +317,22 @@ class TelegramPublisher:
                             logger.info("✅ Текст отправлен успешно")
                             return True
                         else:
-                            logger.error(f"❌ Ошибка API Telegram: {response.status} - {response_text}")
+                            logger.error(
+                                f"❌ Ошибка API Telegram: {response.status} - {response_text}"
+                            )
 
                             # Проверяем конкретные ошибки
-                            if "can't parse entities" in response_text.lower() or "bad request" in response_text.lower():
+                            if (
+                                "can't parse entities" in response_text.lower()
+                                or "bad request" in response_text.lower()
+                            ):
                                 logger.warning("⚠️  Проблема с HTML, пробуем без разметки")
 
-                                params['parse_mode'] = "HTML"
+                                params["parse_mode"] = "HTML"
 
-                                async with session.post(url, params=params, timeout=30) as retry_response:
+                                async with session.post(
+                                    url, params=params, timeout=30
+                                ) as retry_response:
                                     if retry_response.status == 200:
                                         logger.info("✅ Текст отправлен без разметки")
                                         return True
@@ -345,7 +374,7 @@ class TelegramPublisher:
         """
         try:
             # Берем начало текста (заголовок и первую новость)
-            lines = full_text.split('\n')
+            lines = full_text.split("\n")
 
             if len(lines) < 10:
                 # Если текст короткий, возвращаем его весь
@@ -353,18 +382,17 @@ class TelegramPublisher:
             else:
                 # Берем заголовок и первую новость
                 caption_lines = lines
-                caption = '\n'.join(caption_lines)
+                caption = "\n".join(caption_lines)
 
             # Ограничиваем длину
             if len(caption) > max_length:
                 # Находим хорошее место для обрезки
-                cut_position = caption[:max_length].rfind('\n')
+                cut_position = caption[:max_length].rfind("\n")
                 if cut_position > 0:
                     caption = caption[:cut_position]
                 else:
                     caption = caption[:max_length]
                 caption += "..."
-
 
             return caption
 
@@ -382,11 +410,11 @@ class TelegramPublisher:
         Returns:
             True если URL валидный
         """
-        if not url or not url.startswith('http'):
+        if not url or not url.startswith("http"):
             return False
 
         # Проверяем расширения файлов
-        valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+        valid_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
         url_lower = url.lower()
 
         # Проверяем по расширению
@@ -394,16 +422,13 @@ class TelegramPublisher:
             return True
 
         # Для YouTube и других сервисов проверяем наличие ключевых слов
-        if 'youtube.com' in url_lower or 'youtu.be' in url_lower:
+        if "youtube.com" in url_lower or "youtu.be" in url_lower:
             # YouTube превью обычно содержат эти строки
-            if any(keyword in url_lower for keyword in ['maxresdefault', 'hqdefault', 'mqdefault']):
+            if any(keyword in url_lower for keyword in ["maxresdefault", "hqdefault", "mqdefault"]):
                 return True
 
         # Для других сервисов можно добавить дополнительные проверки
-        if 'imgur.com' in url_lower or 'i.redd.it' in url_lower:
-            return True
-
-        return False
+        return bool("imgur.com" in url_lower or "i.redd.it" in url_lower)
 
     async def test_connection(self) -> bool:
         """
@@ -421,9 +446,11 @@ class TelegramPublisher:
                 async with session.get(url, timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
-                        if data.get('ok'):
-                            bot_info = data['result']
-                            logger.info(f"✅ Бот подключен: @{bot_info['username']} ({bot_info['first_name']})")
+                        if data.get("ok"):
+                            bot_info = data["result"]
+                            logger.info(
+                                f"✅ Бот подключен: @{bot_info['username']} ({bot_info['first_name']})"
+                            )
                             return True
                         else:
                             logger.error(f"❌ Ошибка в ответе Telegram: {data}")
@@ -437,7 +464,7 @@ class TelegramPublisher:
             logger.error(f"❌ Ошибка тестирования подключения: {e}")
             return False
 
-    async def send_test_message(self, message: str = None) -> bool:
+    async def send_test_message(self, message: str | None = None) -> bool:
         """
         Отправка тестового сообщения в канал
 
@@ -449,7 +476,10 @@ class TelegramPublisher:
         """
         from datetime import datetime
 
-        test_message = message or f"✅ <b>Тестовое сообщение от News Digest Bot</b>\n\n🤖 Система работает корректно!\n📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+        test_message = (
+            message
+            or f"✅ <b>Тестовое сообщение от News Digest Bot</b>\n\n🤖 Система работает корректно!\n📅 Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+        )
 
         logger.info("🧪 Отправка тестового сообщения в Telegram...")
 
@@ -457,9 +487,9 @@ class TelegramPublisher:
             url = f"{self.base_url}/sendMessage"
 
             params = {
-                'chat_id': self.channel_id,
-                'text': test_message,
-                'parse_mode': 'HTML'
+                "chat_id": self.channel_id,
+                "text": test_message,
+                "parse_mode": "HTML",
             }
 
             async with aiohttp.ClientSession() as session:
@@ -472,11 +502,16 @@ class TelegramPublisher:
                         logger.error(f"❌ Ошибка отправки тестового сообщения: {error_text}")
 
                         # Пробуем без разметки
-                        if "can't parse entities" in error_text.lower() or "bad request" in error_text.lower():
+                        if (
+                            "can't parse entities" in error_text.lower()
+                            or "bad request" in error_text.lower()
+                        ):
                             logger.warning("⚠️  Проблема с HTML, пробуем без разметки")
-                            params['parse_mode'] = "HTML"
+                            params["parse_mode"] = "HTML"
 
-                            async with session.post(url, params=params, timeout=10) as retry_response:
+                            async with session.post(
+                                url, params=params, timeout=10
+                            ) as retry_response:
                                 if retry_response.status == 200:
                                     logger.info("✅ Тестовое сообщение отправлено без разметки")
                                     return True

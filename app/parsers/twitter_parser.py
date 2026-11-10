@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any
 
 import tweepy
 
@@ -25,15 +25,11 @@ class TwitterParser(BaseParser):
         bearer_token = config.api.twitter_bearer_token
 
         if not bearer_token:
-            logger.warning(
-                "Twitter Bearer Token не указан. Twitter парсер будет отключен."
-            )
+            logger.warning("Twitter Bearer Token не указан. Twitter парсер будет отключен.")
             return False
 
         try:
-            self.client = tweepy.Client(
-                bearer_token=bearer_token, wait_on_rate_limit=False
-            )
+            self.client = tweepy.Client(bearer_token=bearer_token, wait_on_rate_limit=False)
 
             logger.info("✅ Twitter API v2 клиент создан с Bearer Token")
             return True
@@ -41,9 +37,7 @@ class TwitterParser(BaseParser):
             logger.error(f"Ошибка инициализации Twitter API: {e}")
             return False
 
-    async def fetch_channel_news(
-        self, channel_url: str, channel_id: str
-    ) -> List[Dict[str, Any]]:
+    async def fetch_channel_news(self, channel_url: str, channel_id: str) -> list[dict[str, Any]]:
         """
         Получение твитов с канала Twitter/X через API v2
         """
@@ -104,10 +98,8 @@ class TwitterParser(BaseParser):
             raw_tweets = list(tweets_response.data) if tweets_response.data else []
             return raw_tweets  # Возвращаем СЫРЫЕ данные
 
-        except tweepy.TooManyRequests as e:
-            logger.warning(
-                f"Превышен лимит Twitter API для @{channel_id}. Подождите 15 минут."
-            )
+        except tweepy.TooManyRequests:
+            logger.warning(f"Превышен лимит Twitter API для @{channel_id}. Подождите 15 минут.")
             return []
 
         except tweepy.TweepyException as e:
@@ -118,7 +110,7 @@ class TwitterParser(BaseParser):
             logger.error(f"Общая ошибка при получении твитов с @{channel_id}: {e}")
             return []
 
-    def _extract_tweet_data(self, tweet, media_dict: dict) -> Dict[str, Any]:
+    def _extract_tweet_data(self, tweet, media_dict: dict) -> dict[str, Any]:
         """Извлечение данных из твита API v2"""
         try:
             # Безопасно получаем текст твита
@@ -194,6 +186,6 @@ class TwitterParser(BaseParser):
             return {}
 
     # Обновляем extract_news_data для использования сохраненного media_dict
-    def extract_news_data(self, raw_data: Any) -> Dict[str, Any]:
+    def extract_news_data(self, raw_data: Any) -> dict[str, Any]:
         """Извлечение данных из СЫРОГО твита Twitter API"""
         return self._extract_tweet_data(raw_data, self._current_media_dict)

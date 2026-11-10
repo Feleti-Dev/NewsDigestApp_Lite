@@ -1,16 +1,16 @@
 """
 Менеджер для управления всеми парсерами и планировщиком.
 """
-import logging
-from typing import Any, Dict
 
-from app.database.db_utils import DatabaseManager
+import logging
+from typing import Any
+
 from app.configs.config import config
+from app.database.db_utils import DatabaseManager
 
 from .telegram_parser import TelegramParser
 from .twitter_parser import TwitterParser
 from .youtube_parser import YouTubeParser
-
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ParserManager:
     """Менеджер для управления всеми парсерами и планировщиком"""
 
-    def __init__(self,db_manager: DatabaseManager):
+    def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
         self.parsers = {}  # Инициализируем пустым
         self._parser_classes = {  # Добавляем словарь классов
@@ -34,7 +34,8 @@ class ParserManager:
             # await self.close_parsers()
             self.parsers = {}
             for name, active in config.app.parser_status.items():
-                if not active: continue
+                if not active:
+                    continue
                 try:
                     self.parsers[name] = self._parser_classes[name]()
                     logger.info(f"В ParserManager создан парсер: {self._parser_classes[name]}")
@@ -57,7 +58,7 @@ class ParserManager:
         self.parsers = {}
         logger.info("Все парсеры и клиенты закрыты")
 
-    async def restart_parsers(self) -> Dict[str, Any]:
+    async def restart_parsers(self) -> dict[str, Any]:
         """
         Перезапуск всех парсеров на основе актуальных настроек.
         Закрывает текущие парсеры и создаёт новые.
@@ -73,23 +74,15 @@ class ParserManager:
         logger.info("✅ Парсеры перезапущены")
         return self.get_parsers_status()
 
-    def get_parsers_status(self) -> Dict[str, Any]:
+    def get_parsers_status(self) -> dict[str, Any]:
         """Проверяем статус API для каждого парсера"""
 
         # Проверяем статус API для каждого парсера
         api_status = {}
         for name, parser in self.parsers.items():
-            if name == "twitter":
+            if name == "twitter" or name == "telegram":
                 api_status[name] = (
-                    "✅ Инициализирован"
-                    if parser.client
-                    else "❌ Требуются API ID/Hash"
-                )
-            elif name == "telegram":
-                api_status[name] = (
-                    "✅ Инициализирован"
-                    if parser.client
-                    else "❌ Требуются API ID/Hash"
+                    "✅ Инициализирован" if parser.client else "❌ Требуются API ID/Hash"
                 )
             elif name == "youtube":
                 api_status[name] = (
@@ -97,11 +90,8 @@ class ParserManager:
                 )
             elif name == "reddit":
                 api_status[name] = (
-                    "✅ Инициализирован"
-                    if parser.reddit
-                    else "❌ Требуются Client ID/Secret"
+                    "✅ Инициализирован" if parser.reddit else "❌ Требуются Client ID/Secret"
                 )
-
 
         return {
             "api_status": api_status,

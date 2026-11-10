@@ -1,13 +1,22 @@
 from datetime import datetime
 
-from sqlalchemy import (Boolean, Column, DateTime, Float, Integer, String,
-                        Text, create_engine)
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    create_engine,
+)
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.configs import config
 
 Base = declarative_base()
+
 
 class NewsItem(Base):
     """Модель новости в базе данных"""
@@ -28,22 +37,14 @@ class NewsItem(Base):
         nullable=False,
         comment="Источник: Telegram/Reddit/X/YouTube",
     )
-    News_URL = Column(
-        "news_url", String(500), nullable=False, unique=True, comment="URL новости"
-    )
-    Headline = Column(
-        "headline", String(500), nullable=True, comment="Заголовок новости"
-    )
+    News_URL = Column("news_url", String(500), nullable=False, unique=True, comment="URL новости")
+    Headline = Column("headline", String(500), nullable=True, comment="Заголовок новости")
     News_text = Column("news_text", Text, nullable=True, comment="Текст новости")
     Publication_date = Column(
         "publication_date", DateTime, nullable=False, comment="Дата публикации (ISO)"
     )
-    Has_image = Column(
-        "has_image", Boolean, default=False, comment="Есть изображение TRUE/FALSE"
-    )
-    Image_URL = Column(
-        "image_url", String(500), nullable=True, comment="URL изображения"
-    )
+    Has_image = Column("has_image", Boolean, default=False, comment="Есть изображение TRUE/FALSE")
+    Image_URL = Column("image_url", String(500), nullable=True, comment="URL изображения")
     Interest_score = Column(
         "interest_score",
         Float,
@@ -71,8 +72,12 @@ class NewsItem(Base):
         default=False,
         comment="Ошибка публикации TRUE/FALSE",
     )
-    Note = Column(
-        "note", Text, nullable=True, comment="Примечание (ошибки/дубликаты/пояснения)"
+    Note = Column("note", Text, nullable=True, comment="Примечание (ошибки/дубликаты/пояснения)")
+    content_embedding = Column(
+        "content_embedding",
+        LargeBinary,
+        nullable=True,
+        comment="Dense-эмбеддинг текста (float32 bytes) для дедупликации",
     )
 
     # Дополнительные технические поля
@@ -85,7 +90,10 @@ class NewsItem(Base):
     )
 
     def __repr__(self):
-        return f"<NewsItem(id={self.ID}, source='{self.Source}', headline='{self.Headline[:30]}...')>"
+        return (
+            f"<NewsItem(id={self.ID}, source='{self.Source}', headline='{self.Headline[:30]}...')>"
+        )
+
 
 class ChannelSource(Base):
     """Модель для хранения источников (каналов) из Google Sheets"""
@@ -100,14 +108,10 @@ class ChannelSource(Base):
     )
     url = Column(String(500), nullable=False, comment="URL канала")
     channel_id = Column(String(200), nullable=True, comment="ID канала (извлеченный)")
-    sheet_name = Column(
-        String(100), nullable=False, comment="Название листа в Google Sheets"
-    )
+    sheet_name = Column(String(100), nullable=False, comment="Название листа в Google Sheets")
     row_number = Column(Integer, nullable=False, comment="Номер строки в листе")
     is_active = Column(Boolean, default=True, comment="Активен ли канал для сбора")
-    last_checked = Column(
-        DateTime, nullable=True, comment="Когда последний раз проверяли"
-    )
+    last_checked = Column(DateTime, nullable=True, comment="Когда последний раз проверяли")
     # НОВЫЕ ПОЛЯ ДЛЯ СТАТИСТИКИ
     news_collected = Column(Integer, default=0, comment="Количество собранных новостей")
     success_count = Column(Integer, default=0, comment="Количество успешных сборов")
@@ -116,7 +120,9 @@ class ChannelSource(Base):
     last_processed = Column(DateTime, nullable=True, comment="Когда последний раз обрабатывался")
 
     def __repr__(self):
-        return f"<ChannelSource(id={self.id}, type='{self.source_type}', channel='{self.channel_id}')>"
+        return (
+            f"<ChannelSource(id={self.id}, type='{self.source_type}', channel='{self.channel_id}')>"
+        )
 
 
 def init_database():
@@ -125,7 +131,7 @@ def init_database():
     Base.metadata.create_all(bind=engine_local)
 
     # Форсируем создание файла БД
-    with engine_local.connect() as conn:
+    with engine_local.connect():
         pass
 
     return engine_local
@@ -135,8 +141,3 @@ def init_database():
 engine = init_database()
 # Создаем сессию
 SessionLocal = sessionmaker(bind=engine, autoflush=True)
-
-
-
-
-

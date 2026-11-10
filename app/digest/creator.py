@@ -2,14 +2,16 @@
 """
 Создатель дайджестов: логика отбора и обработки новостей
 """
+
 import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime
-from app.database.db_utils import DatabaseManager
-from .formatter import HTMLDigestFormatter  # Изменено на HTML форматтер
+from typing import Any
+
 from app.configs.config import config
+from app.database.db_utils import DatabaseManager
 from app.ml.llm_client import get_llm_client
 
+from .formatter import HTMLDigestFormatter  # Изменено на HTML форматтер
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class DigestCreator:
         self.db_manager = DatabaseManager()
         self.formatter = HTMLDigestFormatter()  # Используем HTML форматтер
 
-    async def create_digest(self, digest_type: str, is_test: bool = False) -> Optional[Dict[str, Any]]:
+    async def create_digest(self, digest_type: str, is_test: bool = False) -> dict[str, Any] | None:
         """
         Создание дайджеста указанного типа
 
@@ -57,18 +59,19 @@ class DigestCreator:
             best_image = self._select_best_image(news_items)
 
             digest_data = {
-                'type': digest_type,
-                'text': digest_text,
-                'image_url': best_image,
-                'news_items': news_items,  # Оригинальные новости
-                'news_count': len(news_items),
-                'created_at': datetime.now().isoformat(),
-                'is_test': is_test,
-                'processing_method': 'LLM_API'
+                "type": digest_type,
+                "text": digest_text,
+                "image_url": best_image,
+                "news_items": news_items,  # Оригинальные новости
+                "news_count": len(news_items),
+                "created_at": datetime.now().isoformat(),
+                "is_test": is_test,
+                "processing_method": "LLM_API",
             }
 
             logger.info(
-                f"✅ {digest_type.capitalize()} дайджест создан с помощью LLM API ({len(news_items)} новостей)")
+                f"✅ {digest_type.capitalize()} дайджест создан с помощью LLM API ({len(news_items)} новостей)"
+            )
 
             return digest_data
 
@@ -76,7 +79,7 @@ class DigestCreator:
             logger.error(f"❌ Ошибка создания дайджеста: {e}")
             return None
 
-    async def _get_top_news(self, digest_type: str, is_test: bool = False) -> List[Dict[str, Any]]:
+    async def _get_top_news(self, digest_type: str, is_test: bool = False) -> list[dict[str, Any]]:
         """
         Получение топ новостей из базы данных
 
@@ -90,73 +93,76 @@ class DigestCreator:
         try:
             # Получаем неиспользованные новости за период
             news_objects = self.db_manager.get_news_for_digest(
-                digest_type=digest_type,
-                limit=config.app.max_news_per_digest
+                digest_type=digest_type, limit=config.app.max_news_per_digest
             )
-
 
             # Преобразуем объекты SQLAlchemy в словари
             news_items = []
             for news in news_objects:
                 news_dict = {
-                    'id': news.ID,
-                    'source': news.Source,
-                    'title': news.Headline,
-                    'text': news.News_text,
-                    'url': news.News_URL,
-                    'image_url': news.Image_URL,
-                    'publication_date': news.Publication_date.isoformat() if news.Publication_date else None,
-                    'interest_score': float(news.Interest_score) if news.Interest_score else 0.0,
-                    'has_image': bool(news.Has_image)
+                    "id": news.ID,
+                    "source": news.Source,
+                    "title": news.Headline,
+                    "text": news.News_text,
+                    "url": news.News_URL,
+                    "image_url": news.Image_URL,
+                    "publication_date": news.Publication_date.isoformat()
+                    if news.Publication_date
+                    else None,
+                    "interest_score": float(news.Interest_score) if news.Interest_score else 0.0,
+                    "has_image": bool(news.Has_image),
                 }
                 news_items.append(news_dict)
-            
+
             return news_items
-            
+
         except Exception as e:
             logger.error(f"❌ Ошибка получения новостей из БД: {e}")
             return []
-    
 
-    def _select_best_image(self, news_items: List[Dict[str, Any]]) -> Optional[str]:
+    def _select_best_image(self, news_items: list[dict[str, Any]]) -> str | None:
         """
         Выбор лучшего изображения для дайджеста
-        
+
         Args:
             news_items: Список новостей
-            
+
         Returns:
             URL лучшего изображения или None
         """
         try:
             # Фильтруем новости с изображениями
             news_with_images = [
-                news for news in news_items
-                if news.get('image_url') and 
-                news['image_url'].startswith('http') and
-                not news['image_url'].endswith(('.mp4', '.avi', '.mov'))  # Исключаем видео
+                news
+                for news in news_items
+                if news.get("image_url")
+                and news["image_url"].startswith("http")
+                and not news["image_url"].endswith((".mp4", ".avi", ".mov"))  # Исключаем видео
             ]
-            
+
             if not news_with_images:
                 return None
-            
+
             # Выбираем изображение из новости с наибольшей оценкой
-            best_news = max(news_with_images, key=lambda x: x.get('interest_score', 0))
-            
+            best_news = max(news_with_images, key=lambda x: x.get("interest_score", 0))
+
             # Проверяем, что это изображение (не видео ютуба)
-            if 'youtube.com' in best_news['image_url'] or 'youtu.be' in best_news['image_url']:
+            if "youtube.com" in best_news["image_url"] or "youtu.be" in best_news["image_url"]:
                 # Для YouTube берем превью
-                if 'maxresdefault' in best_news['image_url']:
-                    return best_news['image_url']
+                if "maxresdefault" in best_news["image_url"]:
+                    return best_news["image_url"]
                 else:
                     # Пробуем найти другие изображения
                     for news in news_with_images:
-                        if 'youtube.com' not in news['image_url'] and 'youtu.be' not in news['image_url']:
-                            return news['image_url']
+                        if (
+                            "youtube.com" not in news["image_url"]
+                            and "youtu.be" not in news["image_url"]
+                        ):
+                            return news["image_url"]
                     return None
-            
-            return best_news['image_url']
-            
+
+            return best_news["image_url"]
+
         except Exception as e:
             logger.error(f"Ошибка выбора изображения: {e}")
             return None
